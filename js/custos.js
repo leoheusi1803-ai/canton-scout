@@ -4,9 +4,41 @@
    ============================================================ */
 const CUSTOS = (() => {
 
-  /* alíquotas gerais de PIS/COFINS-Importação (Lei 10.865/2004) */
+  /* ---------- PIS/COFINS-Importação (Lei 10.865/2004, art. 8º) ----------
+     A regra geral é 2,10% + 9,65%. Mas há regimes específicos que pesam MUITO
+     e pegam em cheio a Fase 3: cosmético, perfume, sabonete e escova de dente
+     pagam 20% em vez de 11,75%. Valores conferidos no texto compilado da lei.
+     Detalhe contraintuitivo que a lei faz questão de fazer: escova de DENTE
+     (9603.21.00) entra no regime pesado; escova de CABELO (9603.29.00) não.
+     E a posição 33.06 (higiene bucal) está excluída do §2º.                  */
   const PIS_IMP = 2.10;
   const COFINS_IMP = 9.65;
+
+  const REGIMES = [
+    { nome: '§2º perfumaria, toucador e higiene pessoal',
+      pis: 3.52, cofins: 16.48,
+      inclui: ['3303', '3304', '3305', '3307', '34011190', '34012010', '96032100'],
+      exclui: ['3306'] },
+    { nome: '§1º produtos farmacêuticos',
+      pis: 2.76, cofins: 13.03,
+      inclui: ['3001', '3003', '3004', '30021', '30022', '30063',
+               '30029020', '30029092', '30029099', '30051010', '30066000'],
+      exclui: ['30039056', '30049046'] },
+    { nome: '§5º pneus novos e câmaras de ar',
+      pis: 2.68, cofins: 12.35,
+      inclui: ['4011', '4013'], exclui: [] }
+  ];
+
+  function pisCofinsDe(ncm) {
+    const c = String(ncm || '').replace(/\D/g, '');
+    for (const r of REGIMES) {
+      if (r.exclui.some(p => c.startsWith(p))) continue;
+      if (r.inclui.some(p => c.startsWith(p))) {
+        return { pis: r.pis, cofins: r.cofins, regime: r.nome, especial: true };
+      }
+    }
+    return { pis: PIS_IMP, cofins: COFINS_IMP, regime: 'regra geral', especial: false };
+  }
   /* 2026 é ano-teste da reforma: CBS 0,9% + IBS 0,1% (EC 132 / LC 214) */
   const CBS_2026 = 0.90;
   const IBS_2026 = 0.10;
@@ -76,11 +108,12 @@ const CUSTOS = (() => {
     add('trib', ipiNT ? 'IPI (NT — não tributado)' : `IPI (${ipiPct}%)`, IPI, '(VA + II) × alíquota TIPI');
 
     const legado = cfg.dataRef !== '2027';
-    const PIS = legado ? VA * PIS_IMP / 100 : 0;
-    const COFINS = legado ? VA * COFINS_IMP / 100 : 0;
+    const pc = pisCofinsDe(p.ncm);
+    const PIS = legado ? VA * pc.pis / 100 : 0;
+    const COFINS = legado ? VA * pc.cofins / 100 : 0;
     if (legado) {
-      add('trib', `PIS-Importação (${PIS_IMP}%)`, PIS, 'VA × alíquota');
-      add('trib', `COFINS-Importação (${COFINS_IMP}%)`, COFINS, 'VA × alíquota');
+      add('trib', `PIS-Importação (${pc.pis}%)`, PIS, 'VA × alíquota · ' + pc.regime);
+      add('trib', `COFINS-Importação (${pc.cofins}%)`, COFINS, 'VA × alíquota · ' + pc.regime);
     }
 
     /* CBS/IBS — base ainda em regulamentação; usa VA + II + IPI */
@@ -164,6 +197,7 @@ const CUSTOS = (() => {
       linhas: L,
       VA, II, IPI, PIS, COFINS, CBS, IBS, ICMS, afrmm, siscomex, despesas,
       tributos, total, creditos: cred, creditoLinhas: credL, liquido,
+      pisPct: pc.pis, cofinsPct: pc.cofins, regimePisCofins: pc.regime, pisCofinsEspecial: pc.especial,
       icmsAproveitado, icmsAcumulado, debitoSaida, vendaEstim,
       unit: total / qtd,
       unitLiquido: liquido / qtd,
@@ -193,5 +227,5 @@ const CUSTOS = (() => {
     margemAlvo: 45
   };
 
-  return { calcular, precoVenda, CFG_PADRAO, PIS_IMP, COFINS_IMP, AFRMM };
+  return { calcular, precoVenda, pisCofinsDe, CFG_PADRAO, PIS_IMP, COFINS_IMP, AFRMM };
 })();

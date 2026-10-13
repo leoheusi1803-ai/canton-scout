@@ -2,6 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
+  const VERSAO = 'v5 · 13/10/2026 · com foto';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -304,6 +305,7 @@
   /* ---------------- bloco de risco ---------------- */
   function blocoRisco(r) {
     const it = r.item;
+    const pcB = CUSTOS.pisCofinsDe(r.ncm);
     let h = `<div class="card" style="margin:12px 0 0">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px">
         <span class="code" style="font-size:16px;font-weight:700">${r.ncm}</span>
@@ -314,9 +316,14 @@
             <div class="it-sub" style="margin-bottom:9px">${esc(BASE.capitulo(it.cap))}${it.path ? ' › ' + esc(it.path) : ''}</div>
             <table class="br">
               <tr><td>Imposto de Importação<span class="ref">${esc(it.iiFonte)}</span></td><td>${it.ii === null ? '—' : it.ii + '%'}</td></tr>
-              <tr><td>IPI</td><td>${it.ipi === null ? '—' : (it.ipi === 'NT' ? 'NT' : it.ipi + '%')}</td></tr>
+              <tr><td>IPI<span class="ref">base: VA + II</span></td><td>${it.ipi === null ? '—' : (it.ipi === 'NT' ? 'NT' : it.ipi + '%')}</td></tr>
+              <tr><td>PIS-Importação<span class="ref">${esc(pcB.regime)}</span></td><td>${pcB.pis}%</td></tr>
+              <tr><td>COFINS-Importação<span class="ref">${esc(pcB.regime)}</span></td><td>${pcB.cofins}%</td></tr>
               ${it.mark ? `<tr><td>Marcador TEC</td><td>${esc(it.mark)}</td></tr>` : ''}
-            </table>`;
+            </table>
+            <p class="hint">PIS/COFINS conforme Lei 10.865/2004, art. 8º. Não está modelado aqui o
+            adicional de 1 ponto percentual de COFINS que incide sobre as NCMs do Anexo I da Lei
+            12.546/2011 — confirme com seu despachante se a sua posição está nessa lista.</p>`;
     }
 
     if (r.antidumping.length) {
@@ -512,6 +519,11 @@
       cond: alvo ? alvo.cond : 'novo',
       texto: (alvo ? alvo.nome + ' ' + alvo.desc + ' ' : '') + guia.prod.n
     });
+    const pc = CUSTOS.pisCofinsDe(ncm);
+    // soma dos federais: II + IPI (sobre VA+II) + PIS + COFINS, em pontos do VA
+    const somaFed = (typeof it.ii === 'number')
+      ? it.ii + (typeof it.ipi === 'number' ? it.ipi * (1 + it.ii / 100) : 0) + pc.pis + pc.cofins
+      : null;
     const ALERTA = {
       bad: 'Cuidado sério antes de comprar',
       mid: 'Precisa de licença antes de embarcar',
@@ -529,7 +541,7 @@
 
     let custoHtml = '';
     if (alvo && alvo.preco > 0 && (alvo.qtd || alvo.moq)) {
-      const c = CUSTOS.calcular(Object.assign({}, alvo, { ii: it.ii, ipi: it.ipi }), cfg);
+      const c = CUSTOS.calcular(Object.assign({}, alvo, { ncm: ncm, ii: it.ii, ipi: it.ipi }), cfg);
       custoHtml = `<div class="kpi" style="margin-bottom:12px">
         <div><div class="k-l">Custo por peça</div><div class="k-v hi">${brl(c.unit)}</div>
           <div class="k-s">posto no Brasil</div></div>
@@ -542,10 +554,20 @@
         <div class="ncm">${fmtNcm(ncm)}</div>
         <div class="dsc">${esc(it.desc)}</div>
         <div class="nums">
-          <div>Imposto de Importação<b>${it.ii === null ? '—' : it.ii + '%'}</b></div>
+          <div>Imp. Importação<b>${it.ii === null ? '—' : it.ii + '%'}</b></div>
           <div>IPI<b>${it.ipi === 'NT' ? 'NT' : (it.ipi === null ? '—' : it.ipi + '%')}</b></div>
+          <div>PIS<b>${pc.pis}%</b></div>
+          <div>COFINS<b>${pc.cofins}%</b></div>
+        </div>
+        <div class="nums" style="border-top:1px solid rgba(255,255,255,.18);margin-top:11px;padding-top:10px">
+          <div>Tributos federais<b>${somaFed === null ? '—' : somaFed.toFixed(2).replace('.', ',') + '%'}</b></div>
+          <div>+ ICMS ${cfg.icmsPct}%<b style="font-size:15px">no cálculo de custo</b></div>
           ${r.orgaos.length ? `<div>Órgãos<b style="font-size:15px">${esc(r.orgaos.join(' '))}</b></div>` : ''}
         </div>
+        ${pc.especial ? `<div class="dsc" style="margin-top:10px;color:#fde68a">
+          <b style="color:#fde68a">Atenção:</b> esta NCM está no regime especial de PIS/COFINS
+          (${esc(pc.regime)}, Lei 10.865/2004) — ${(pc.pis + pc.cofins).toFixed(2).replace('.', ',')}%
+          em vez dos 11,75% da regra geral.</div>` : ''}
       </div>
       <div class="alerta ${r.nivel}"><b>${ALERTA[r.nivel]}</b>${expl[r.nivel]}</div>
       ${custoHtml}
@@ -807,7 +829,8 @@
     avisoSaida();
     $('#k-fontes').innerHTML = (() => {
       const m = BASE.meta();
-      return `<div><b>NCM / TEC — Imposto de Importação</b><br>${esc(m.fiscal.tec_ato)}</div>
+      return `<div><b>Versão do app</b><br>${esc(VERSAO)}</div>
+        <div><b>NCM / TEC — Imposto de Importação</b><br>${esc(m.fiscal.tec_ato)}</div>
         <div><b>TIPI — IPI</b><br>${esc(m.fiscal.tipi_ato)}</div>
         <div><b>Tratamento administrativo / anuentes</b><br>${esc(m.anuencia.fonte)}</div>
         <div><b>Antidumping</b><br>${esc(m.antidumping.fonte)} — ${m.antidumping.total} medidas, ${m.antidumping.total_china} envolvendo a China</div>
@@ -880,19 +903,27 @@
         ? caches.open(ks.find(k => k.startsWith('canton-scout')) || ks[0]).then(c => c.keys())
         : []),
       navigator.storage && navigator.storage.persisted ? navigator.storage.persisted() : Promise.resolve(false),
-      DB.espaco()
-    ]).then(([reg, estado, chaves, persistido, esp]) => {
+      DB.espaco(),
+      // o modelo de visão é o pedaço mais pesado: confirma que baixou
+      caches.keys().then(ks => ks.length
+        ? caches.open(ks[0]).then(c => c.match('modelo/group1-shard4of4')).then(m => !!m)
+        : false).catch(() => false)
+    ]).then(([reg, estado, chaves, persistido, esp, temModelo]) => {
       const temSw = !!(reg && reg.active);
       const nCache = estado ? estado.total : chaves.length;
-      const esperado = estado ? estado.esperado : 13;
+      const esperado = estado ? estado.esperado : 24;
       const cacheOk = nCache >= esperado;
       const mb = esp && esp.usage ? (esp.usage / 1048576).toFixed(1) + ' MB usados' : '';
       const tudoOk = temSw && cacheOk;
 
       out.innerHTML = `
         <table class="br" style="margin-top:12px">
+          ${linha(true, 'Versão instalada', VERSAO)}
           ${linha(temSw, 'Service worker instalado', temSw ? 'o app abre sem rede' : 'sem ele o app NÃO abre offline')}
           ${linha(cacheOk, 'Base fiscal gravada no aparelho', nCache + ' de ' + esperado + ' arquivos em cache')}
+          ${linha(temModelo, 'Reconhecimento por foto', temModelo
+            ? 'modelo de visão gravado — a foto é classificada no aparelho'
+            : 'modelo NÃO baixado — a foto não vai ser reconhecida')}
           ${linha(persistido, 'Armazenamento persistente', persistido
             ? 'o navegador não vai apagar suas fotos'
             : 'o navegador pode apagar os dados se faltar espaço — instale o app na tela inicial')}
