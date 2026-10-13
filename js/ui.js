@@ -987,7 +987,21 @@
     window.addEventListener('offline', rede);
     // service worker: é o que garante abrir sem internet
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        // Sem isto, uma versão nova fica presa no cache até a pessoa recarregar
+        // duas vezes — e elas não vão saber fazer isso. Com rede, avisa e recarrega.
+        reg.addEventListener('updatefound', () => {
+          const novo = reg.installing;
+          if (!novo) return;
+          novo.addEventListener('statechange', () => {
+            if (novo.state === 'installed' && navigator.serviceWorker.controller) {
+              toast('Versão nova baixada · recarregando…');
+              setTimeout(() => location.reload(), 2200);
+            }
+          });
+        });
+        if (navigator.onLine) reg.update().catch(() => {});
+      }).catch(() => {});
     }
   }
 
