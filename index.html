@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Canton Scout</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<div id="splash">
+  <div class="splash-in">
+    <div class="splash-logo">CS</div>
+    <h1>Canton Scout</h1>
+    <p id="splash-msg">carregando base fiscal…</p>
+    <div class="bar"><div id="splash-bar"></div></div>
+  </div>
+</div>
+
+<header id="top">
+  <div class="top-l">
+    <strong id="view-title">Capturar</strong>
+    <span id="net-pill" class="pill pill-off">offline</span>
+  </div>
+  <div class="top-r">
+    <span id="count-pill" class="pill">0 produtos</span>
+  </div>
+</header>
+
+<main>
+  <!-- ======================= CAPTURAR ======================= -->
+  <section id="v-capturar" class="view on">
+    <div class="card hero">
+      <label class="shoot">
+        <input type="file" id="cam" accept="image/*" capture="environment" multiple hidden>
+        <span class="shoot-ico">&#128247;</span>
+        <span class="shoot-txt">Fotografar produto<small>abre a câmera do celular</small></span>
+      </label>
+      <label class="shoot shoot-alt">
+        <input type="file" id="gal" accept="image/*,video/*" multiple hidden>
+        <span class="shoot-ico">&#128194;</span>
+        <span class="shoot-txt">Escolher da galeria<small>fotos e vídeos já tirados</small></span>
+      </label>
+    </div>
+
+    <div id="thumbs" class="thumbs"></div>
+
+    <div class="card">
+      <div class="f">
+        <label for="f-nome">Produto <b>*</b></label>
+        <input id="f-nome" type="text" placeholder="ex.: caneca de cerâmica 400ml" autocomplete="off">
+      </div>
+      <div class="f">
+        <label for="f-desc">Detalhes que definem a NCM</label>
+        <textarea id="f-desc" rows="2" placeholder="material, função, se é elétrico, voltagem, se tem rádio/bluetooth, uso infantil…"></textarea>
+      </div>
+
+      <div class="row">
+        <div class="f">
+          <label for="f-preco">Preço unit. FOB</label>
+          <input id="f-preco" type="number" inputmode="decimal" step="0.01" placeholder="0,00">
+        </div>
+        <div class="f f-sm">
+          <label for="f-moeda">Moeda</label>
+          <select id="f-moeda"><option>USD</option><option>CNY</option></select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="f"><label for="f-moq">MOQ</label><input id="f-moq" type="number" inputmode="numeric" placeholder="peças"></div>
+        <div class="f"><label for="f-qtd">Qtd. que pretendo</label><input id="f-qtd" type="number" inputmode="numeric" placeholder="peças"></div>
+      </div>
+
+      <div class="row">
+        <div class="f"><label for="f-peso">Peso unit. (kg)</label><input id="f-peso" type="number" inputmode="decimal" step="0.001" placeholder="0,000"></div>
+        <div class="f"><label for="f-cbm">CBM unit. (m³)</label><input id="f-cbm" type="number" inputmode="decimal" step="0.00001" placeholder="0,00000"></div>
+      </div>
+
+      <div class="f">
+        <label for="f-forn">Fornecedor / estande</label>
+        <input id="f-forn" type="text" placeholder="nome da empresa">
+      </div>
+      <div class="row">
+        <div class="f"><label for="f-estande">Nº do estande</label><input id="f-estande" type="text" placeholder="ex.: 11.2 K23"></div>
+        <div class="f"><label for="f-fase">Fase</label><select id="f-fase"><option value="2">Fase 2</option><option value="3">Fase 3</option><option value="1">Fase 1</option></select></div>
+      </div>
+      <div class="f">
+        <label for="f-contato">Contato (WeChat / e-mail / tel.)</label>
+        <input id="f-contato" type="text" placeholder="cole o WeChat ID aqui">
+      </div>
+
+      <div class="f">
+        <label>Condição</label>
+        <div class="seg" id="f-cond">
+          <button type="button" class="on" data-v="novo">Novo</button>
+          <button type="button" data-v="usado">Usado / recond.</button>
+        </div>
+      </div>
+
+      <div class="f">
+        <label for="f-obs">Observações</label>
+        <textarea id="f-obs" rows="2" placeholder="qualidade, amostra prometida, prazo, negociação…"></textarea>
+      </div>
+
+      <button id="btn-salvar" class="primary big">Salvar produto</button>
+      <p class="hint">Salva no aparelho, sem internet. A classificação fiscal você faz na aba <b>NCM</b> — pelo produto salvo ou direto na busca.</p>
+    </div>
+  </section>
+
+  <!-- ======================= PRODUTOS ======================= -->
+  <section id="v-produtos" class="view">
+    <div class="card tight">
+      <input id="p-filtro" type="search" placeholder="filtrar por nome, fornecedor, estande, NCM…">
+      <div class="seg wide" id="p-ord">
+        <button type="button" class="on" data-v="data">Mais recentes</button>
+        <button type="button" data-v="risco">Pior risco</button>
+        <button type="button" data-v="custo">Menor custo</button>
+      </div>
+    </div>
+    <div id="p-lista" class="lista"></div>
+    <div class="card">
+      <button id="btn-export-json" class="ghost">Exportar backup (.json)</button>
+      <button id="btn-export-csv" class="ghost">Exportar planilha (.csv)</button>
+      <label class="ghost as-btn">Importar backup<input type="file" id="imp-json" accept=".json" hidden></label>
+      <p class="hint">O backup salva tudo, inclusive as fotos. Faça um por dia no hotel.</p>
+    </div>
+  </section>
+
+  <!-- ======================= NCM ======================= -->
+  <section id="v-ncm" class="view">
+    <div class="card tight">
+      <input id="q" type="search" placeholder="descreva o produto, em PT ou EN… ex.: ceramic mug, luminária led, tênis">
+      <div id="q-ctx" class="qctx"></div>
+      <div id="q-sug" class="chips"></div>
+    </div>
+    <div id="q-res" class="lista"></div>
+  </section>
+
+  <!-- ======================= CUSTOS ======================= -->
+  <section id="v-custos" class="view">
+    <div class="card tight">
+      <select id="c-produto"><option value="">— escolha um produto salvo —</option></select>
+    </div>
+    <div id="c-saida"></div>
+  </section>
+
+  <!-- ======================= CONFIG ======================= -->
+  <section id="v-config" class="view">
+    <div class="card">
+      <h3>Câmbio</h3>
+      <div class="row">
+        <div class="f"><label for="k-usd">USD → BRL</label><input id="k-usd" type="number" step="0.0001" inputmode="decimal"></div>
+        <div class="f"><label for="k-cny">CNY → BRL</label><input id="k-cny" type="number" step="0.0001" inputmode="decimal"></div>
+      </div>
+      <p class="hint">Anote a cotação antes de embarcar. Sem internet o app não atualiza sozinho.</p>
+    </div>
+
+    <div class="card">
+      <h3>Tributação</h3>
+      <div class="row">
+        <div class="f"><label for="k-uf">UF de desembaraço</label><select id="k-uf"></select></div>
+        <div class="f"><label for="k-icms">ICMS (%)</label><input id="k-icms" type="number" step="0.01" inputmode="decimal"></div>
+      </div>
+      <p class="warn" id="icms-aviso"></p>
+      <div class="f">
+        <label for="k-regime">Regime tributário</label>
+        <select id="k-regime">
+          <option value="real">Lucro Real / Presumido (aproveita créditos)</option>
+          <option value="simples">Simples Nacional (não aproveita créditos)</option>
+        </select>
+      </div>
+      <div class="f">
+        <label for="k-data">Data de referência do cálculo</label>
+        <select id="k-data">
+          <option value="2026">2026 — PIS/COFINS + CBS/IBS em teste (0,9% + 0,1%)</option>
+          <option value="2027">2027 — CBS cheia, PIS/COFINS extintos</option>
+          <option value="legado">Só regime antigo (sem CBS/IBS)</option>
+        </select>
+      </div>
+      <label class="chk"><input type="checkbox" id="k-capatazia"> Incluir capatazia/THC no valor aduaneiro</label>
+    </div>
+
+    <div class="card">
+      <h3>Logística padrão</h3>
+      <div class="f">
+        <label for="k-modal">Modal</label>
+        <select id="k-modal">
+          <option value="lcl">Marítimo LCL (carga solta)</option>
+          <option value="fcl20">Marítimo FCL 20'</option>
+          <option value="fcl40">Marítimo FCL 40'HC</option>
+          <option value="aereo">Aéreo</option>
+        </select>
+      </div>
+      <div class="row">
+        <div class="f"><label for="k-frete">Frete internacional (USD)</label><input id="k-frete" type="number" step="0.01" inputmode="decimal"></div>
+        <div class="f"><label for="k-seguro">Seguro (% do FOB+frete)</label><input id="k-seguro" type="number" step="0.01" inputmode="decimal"></div>
+      </div>
+      <div class="row">
+        <div class="f"><label for="k-desp">Despesas locais (BRL)</label><input id="k-desp" type="number" step="0.01" inputmode="decimal"></div>
+        <div class="f"><label for="k-siscomex">Taxa Siscomex/DUIMP (BRL)</label><input id="k-siscomex" type="number" step="0.01" inputmode="decimal"></div>
+      </div>
+      <p class="hint">Despesas locais = THC + armazenagem + desconsolidação + despachante + frete interno. Valor estimado, ajuste com seu agente.</p>
+    </div>
+
+    <div class="card">
+      <h3>Pronto para o offline?</h3>
+      <p class="hint" style="margin-top:0">Rode este teste <b>no Brasil, antes de embarcar</b>. Se der verde,
+      o app abre dentro do pavilhão sem nenhuma internet.</p>
+      <button id="btn-teste" class="primary">Testar modo offline</button>
+      <div id="teste-saida"></div>
+    </div>
+
+    <div class="card">
+      <h3>Base de dados embarcada</h3>
+      <div id="k-fontes" class="fontes"></div>
+      <button id="btn-reset" class="ghost danger">Apagar todos os dados do app</button>
+    </div>
+  </section>
+</main>
+
+<nav id="tabs">
+  <button data-v="capturar" class="on"><span>&#10133;</span>Capturar</button>
+  <button data-v="produtos"><span>&#128230;</span>Produtos</button>
+  <button data-v="ncm"><span>&#128269;</span>NCM</button>
+  <button data-v="custos"><span>&#128181;</span>Custos</button>
+  <button data-v="config"><span>&#9881;</span>Config</button>
+</nav>
+
+<div id="toast"></div>
+<div id="modal" class="modal"><div class="modal-in"><div id="modal-body"></div><button id="modal-x" class="ghost">Fechar</button></div></div>
+
+<script src="js/db.js"></script>
+<script src="js/dados.js"></script>
+<script src="js/custos.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
