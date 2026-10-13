@@ -51,7 +51,7 @@ Baixado em **13/10/2026**. Total: ~7 MB no aparelho.
 8. Repita nos outros celulares e no notebook.
 
 > Depois de embarcar eu não consigo mais atualizar nada. O que estiver no
-> aparelho no dia 21 é o que vocês vão ter na feira.
+> aparelho no momento do embarque é o que vocês vão ter na feira.
 
 ## Hospedagem (passo 1)
 
