@@ -134,12 +134,24 @@
 
   <!-- ======================= NCM ======================= -->
   <section id="v-ncm" class="view">
-    <div class="card tight">
-      <input id="q" type="search" placeholder="descreva o produto, em PT ou EN… ex.: ceramic mug, luminária led, tênis">
-      <div id="q-ctx" class="qctx"></div>
-      <div id="q-sug" class="chips"></div>
+    <div class="seg" id="ncm-modo" style="margin-bottom:12px">
+      <button type="button" class="on" data-v="guiado">Guiado</button>
+      <button type="button" data-v="busca">Buscar por texto</button>
     </div>
-    <div id="q-res" class="lista"></div>
+
+    <div id="m-guiado">
+      <div id="g-trilha" class="trilha"></div>
+      <div id="g-corpo"></div>
+    </div>
+
+    <div id="m-busca" hidden>
+      <div class="card tight">
+        <input id="q" type="search" placeholder="descreva o produto, em PT ou EN… ex.: ceramic mug, luminária led, tênis">
+        <div id="q-ctx" class="qctx"></div>
+        <div id="q-sug" class="chips"></div>
+      </div>
+      <div id="q-res" class="lista"></div>
+    </div>
   </section>
 
   <!-- ======================= CUSTOS ======================= -->

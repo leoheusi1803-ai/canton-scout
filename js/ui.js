@@ -36,6 +36,7 @@
     window.scrollTo(0, 0);
     if (v === 'produtos') renderProdutos();
     if (v === 'custos') renderSelectCustos();
+    if (v === 'ncm' && !$('#m-guiado').hidden) renderGuia();
   }
 
   const NIVEL_TAG = { ok: 'tag-ok', warn: 'tag-warn', mid: 'tag-mid', bad: 'tag-bad' };
@@ -179,6 +180,8 @@
       tags.push(`<span class="tag tag-ac code">${p.ncm}</span>`);
       tags.push(`<span class="tag ${NIVEL_TAG[r.nivel]}">${esc(r.rotulo)}</span>`);
       r.orgaos.slice(0, 3).forEach(o => tags.push(`<span class="tag">${esc(o)}</span>`));
+    } else if (p.paraRevisar) {
+      tags.push('<span class="tag tag-bad">↑ Leonardo precisa classificar</span>');
     } else {
       tags.push('<span class="tag tag-warn">sem NCM — classificar</span>');
     }
@@ -231,10 +234,16 @@
           <button class="ghost danger" id="m-apagar">Apagar produto</button>
         </div>`);
       $('#m-classificar').onclick = () => {
-        fecharModal(); ir('ncm');
+        fecharModal();
+        alvoProduto = p.id;
+        // vai para o assistente guiado: é o caminho de quem não sabe comex
+        $$('#ncm-modo button').forEach(x => x.classList.toggle('on', x.dataset.v === 'guiado'));
+        $('#m-guiado').hidden = false;
+        $('#m-busca').hidden = true;
         $('#q').value = (p.nome + ' ' + p.desc).trim();
-        alvoProduto = p.id; buscarNcm();
-        toast('Escolha a NCM para: ' + p.nome);
+        buscarNcm();
+        gReset();
+        ir('ncm');
       };
       const bc = $('#m-custo');
       if (bc) bc.onclick = () => { fecharModal(); ir('custos'); $('#c-produto').value = p.id; renderCustos(); };
@@ -312,6 +321,217 @@
     }
     h += `</div>`;
     return h;
+  }
+
+  /* ============================================================
+     ASSISTENTE GUIADO
+     Para quem não sabe comex. A pessoa escolhe categoria, produto e
+     material; o app resolve a NCM. Quando o código ainda não é folha,
+     ele desce na árvore oficial e usa o texto da própria tabela como
+     pergunta — assim a redação é da Receita, não minha.
+     ============================================================ */
+  let PRODUTOS = null;                       // data/produtos.json
+  let guia = { cat: null, prod: null, cod: null, caminho: [] };
+
+  function carregarProdutos() {
+    return fetch('data/produtos.json').then(r => r.json()).then(j => { PRODUTOS = j; });
+  }
+
+  function gReset() { guia = { cat: null, prod: null, cod: null, caminho: [] }; renderGuia(); }
+
+  function renderGuia() {
+    if (!PRODUTOS) { $('#g-corpo').innerHTML = '<p class="hint">carregando…</p>'; return; }
+    renderTrilha();
+    if (!guia.cat) return gCategorias();
+    if (!guia.prod) return gProdutos();
+    if (!guia.cod) return gPergunta();
+    return gDescer();
+  }
+
+  function renderTrilha() {
+    const t = [];
+    t.push(`<button data-ir="inicio" class="${!guia.cat ? 'on' : ''}">Início</button>`);
+    if (guia.cat) {
+      const c = PRODUTOS.categorias.find(x => x.id === guia.cat);
+      t.push('<span>›</span>');
+      t.push(`<button data-ir="cat" class="${!guia.prod ? 'on' : ''}">${esc(c.nome)}</button>`);
+    }
+    if (guia.prod) {
+      t.push('<span>›</span>');
+      t.push(`<button data-ir="prod" class="${!guia.cod ? 'on' : ''}">${esc(guia.prod.n.split(' / ')[0])}</button>`);
+    }
+    $('#g-trilha').innerHTML = t.join('');
+    $('#g-trilha').querySelectorAll('[data-ir]').forEach(b => b.onclick = () => {
+      if (b.dataset.ir === 'inicio') gReset();
+      else if (b.dataset.ir === 'cat') { guia.prod = null; guia.cod = null; guia.caminho = []; renderGuia(); }
+      else { guia.cod = null; guia.caminho = []; renderGuia(); }
+    });
+  }
+
+  function gCategorias() {
+    const alvo = alvoProduto ? produtos.find(p => p.id === alvoProduto) : null;
+    $('#g-corpo').innerHTML =
+      (alvo ? `<div class="card tight" style="background:#172e5c;border-color:#2b4ba8;margin-bottom:12px">
+        <b>Classificando:</b> ${esc(alvo.nome)}<small>escolha a categoria do produto</small></div>` : '')
+      + `<p class="pergunta">O que é o produto?</p><div class="grade">`
+      + PRODUTOS.categorias.map(c =>
+        `<button data-cat="${c.id}"><span class="ico">${c.ico}</span>${esc(c.nome)}</button>`).join('')
+      + `</div>`;
+    $('#g-corpo').querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
+      guia.cat = b.dataset.cat; renderGuia();
+    });
+  }
+
+  function gProdutos() {
+    const lista = PRODUTOS.produtos.filter(p => p.cat === guia.cat);
+    $('#g-corpo').innerHTML = `<p class="pergunta">Qual deles?</p><div class="opcoes">`
+      + lista.map((p, i) => `<button data-p="${i}">
+          <span>${esc(p.n)}<small>${esc((p.alt || []).slice(0, 4).join(' · '))}</small></span>
+          <span class="seta">›</span></button>`).join('')
+      + `</div>
+         <button class="ghost" id="g-nao" style="margin-top:12px">Não achei meu produto aqui</button>`;
+    $('#g-corpo').querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
+      guia.prod = lista[+b.dataset.p]; renderGuia();
+    });
+    $('#g-nao').onclick = gNaoAchei;
+  }
+
+  function gPergunta() {
+    const p = guia.prod;
+    $('#g-corpo').innerHTML = `<p class="pergunta">${esc(p.q)}</p><div class="opcoes">`
+      + p.op.map((o, i) => `<button data-o="${i}"><span>${esc(o[0])}</span><span class="seta">›</span></button>`).join('')
+      + `</div>
+         <p class="hint">Na dúvida sobre o material, pergunte ao expositor. É o material que define a NCM —
+         a mesma caneca em porcelana, cerâmica, plástico ou vidro tem quatro códigos e quatro impostos diferentes.</p>
+         <button class="ghost" id="g-nao" style="margin-top:12px">Nenhuma dessas</button>`;
+    $('#g-corpo').querySelectorAll('[data-o]').forEach(b => b.onclick = () => {
+      guia.cod = p.op[+b.dataset.o][1];
+      guia.caminho = [p.op[+b.dataset.o][0]];
+      renderGuia();
+    });
+    $('#g-nao').onclick = gNaoAchei;
+  }
+
+  /* desce na árvore da NCM até chegar num código de 8 dígitos */
+  function gDescer() {
+    const filhos = BASE.itensPorPrefixo(guia.cod);
+    if (!filhos.length) { $('#g-corpo').innerHTML = '<p class="warn">Código não encontrado na base.</p>'; return; }
+    if (filhos.length === 1) return gResultado(filhos[0].ncm);
+    if (guia.cod.length === 8) return gResultado(guia.cod);
+
+    // agrupa pelo próximo nível da árvore oficial
+    const nivel = guia.cod.length < 6 ? 6 : 8;
+    const grupos = new Map();
+    filhos.forEach(it => {
+      const k = it.ncm.slice(0, nivel);
+      if (!grupos.has(k)) grupos.set(k, []);
+      grupos.get(k).push(it);
+    });
+    if (grupos.size === 1 && nivel < 8) { guia.cod = Array.from(grupos.keys())[0]; return gDescer(); }
+
+    const ops = Array.from(grupos.entries()).map(([k, its]) => ({
+      cod: k,
+      txt: its.length === 1 ? its[0].desc : (BASE.item(k) ? BASE.item(k).desc : its[0].path.split(' > ').pop() || its[0].desc),
+      n: its.length
+    }));
+    $('#g-corpo').innerHTML = `<p class="pergunta">Qual destes descreve melhor?</p>
+      <p class="hint" style="margin:0 0 11px">Texto oficial da tabela NCM. Se nenhum servir exatamente, escolha "Outros".</p>
+      <div class="opcoes">`
+      + ops.map((o, i) => `<button data-d="${i}">
+          <span>${esc(o.txt)}<small>NCM ${o.cod}${o.n > 1 ? ' · ' + o.n + ' subitens' : ''}</small></span>
+          <span class="seta">›</span></button>`).join('')
+      + `</div>`;
+    $('#g-corpo').querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
+      guia.cod = ops[+b.dataset.d].cod;
+      guia.caminho.push(ops[+b.dataset.d].txt);
+      renderGuia();
+    });
+  }
+
+  function gResultado(ncm) {
+    const alvo = alvoProduto ? produtos.find(p => p.id === alvoProduto) : null;
+    const it = BASE.item(ncm);
+    const r = BASE.risco(ncm, {
+      cond: alvo ? alvo.cond : 'novo',
+      texto: (alvo ? alvo.nome + ' ' + alvo.desc + ' ' : '') + guia.prod.n
+    });
+    const ALERTA = {
+      bad: 'Cuidado sério antes de comprar',
+      mid: 'Precisa de licença antes de embarcar',
+      warn: 'Tem exigência a verificar',
+      ok: 'Nenhuma barreira encontrada'
+    };
+    const expl = {
+      bad: r.antidumping.length
+        ? 'Existe antidumping para esse tipo de produto vindo da China. É um imposto extra que entra por fora e pode passar de 100% do valor. Não feche pedido sem falar com o Leonardo.'
+        : 'A importação desse item está impedida ou muito restrita. Fale com o Leonardo antes de negociar.',
+      mid: 'Esse produto exige licença de um órgão do governo ANTES do embarque na China. Dá para importar, mas o processo é mais lento e tem custo. Avise o Leonardo.',
+      warn: 'Há exigência administrativa ou condição a confirmar. Dá para seguir, mas registre e mostre ao Leonardo.',
+      ok: 'Nada foi encontrado na base. Ainda assim o Leonardo deve confirmar antes de um pedido grande.'
+    };
+
+    let custoHtml = '';
+    if (alvo && alvo.preco > 0 && (alvo.qtd || alvo.moq)) {
+      const c = CUSTOS.calcular(Object.assign({}, alvo, { ii: it.ii, ipi: it.ipi }), cfg);
+      custoHtml = `<div class="kpi" style="margin-bottom:12px">
+        <div><div class="k-l">Custo por peça</div><div class="k-v hi">${brl(c.unit)}</div>
+          <div class="k-s">posto no Brasil</div></div>
+        <div><div class="k-l">Multiplicador</div><div class="k-v">${c.multiplo.toFixed(2)}×</div>
+          <div class="k-s">sobre o preço do estande</div></div></div>`;
+    }
+
+    $('#g-corpo').innerHTML = `
+      <div class="achou">
+        <div class="ncm">${fmtNcm(ncm)}</div>
+        <div class="dsc">${esc(it.desc)}</div>
+        <div class="nums">
+          <div>Imposto de Importação<b>${it.ii === null ? '—' : it.ii + '%'}</b></div>
+          <div>IPI<b>${it.ipi === 'NT' ? 'NT' : (it.ipi === null ? '—' : it.ipi + '%')}</b></div>
+          ${r.orgaos.length ? `<div>Órgãos<b style="font-size:15px">${esc(r.orgaos.join(' '))}</b></div>` : ''}
+        </div>
+      </div>
+      <div class="alerta ${r.nivel}"><b>${ALERTA[r.nivel]}</b>${expl[r.nivel]}</div>
+      ${custoHtml}
+      ${alvo ? `<button class="primary big" id="g-atribuir">Salvar esta NCM em "${esc(alvo.nome)}"</button>`
+             : `<button class="primary big" id="g-escolher">Salvar em um produto</button>`}
+      <button class="ghost" id="g-detalhe" style="margin-top:9px">Ver detalhe técnico (para o Leonardo)</button>
+      <button class="ghost" id="g-outro" style="margin-top:0">Classificar outro produto</button>`;
+
+    const ba = $('#g-atribuir');
+    if (ba) ba.onclick = () => { atribuir(alvo, r); gReset(); };
+    const be = $('#g-escolher');
+    if (be) be.onclick = () => {
+      if (!produtos.length) { toast('Salve um produto primeiro, na aba Capturar'); return; }
+      modal(`<h3>Salvar ${fmtNcm(ncm)} em qual produto?</h3><div class="lista">`
+        + produtos.map(p => `<div class="it" data-sel="${p.id}"><div class="it-nome">${esc(p.nome)}</div>
+            <div class="it-sub">${esc(p.forn || '')}${p.ncm ? ' · hoje: ' + p.ncm : ''}</div></div>`).join('')
+        + '</div>');
+      $('#modal-body').querySelectorAll('[data-sel]').forEach(c => c.onclick = () => {
+        atribuir(produtos.find(p => p.id === c.dataset.sel), r); gReset();
+      });
+    };
+    $('#g-detalhe').onclick = () => modal(blocoRisco(r));
+    $('#g-outro').onclick = gReset;
+  }
+
+  function gNaoAchei() {
+    const alvo = alvoProduto ? produtos.find(p => p.id === alvoProduto) : null;
+    $('#g-corpo').innerHTML = `
+      <div class="alerta warn"><b>Sem problema</b>
+        O dicionário cobre os produtos mais comuns da feira, não todos. Faça assim:
+        tire as fotos, anote o material e as medidas na aba <b>Capturar</b>, e marque para o Leonardo
+        classificar. Não precisa adivinhar — chute em classificação fiscal custa caro.</div>
+      ${alvo ? `<button class="primary big" id="g-marcar">Marcar "${esc(alvo.nome)}" para o Leonardo ver</button>` : ''}
+      <button class="ghost" id="g-voltar" style="margin-top:9px">Voltar e procurar de novo</button>`;
+    const bm = $('#g-marcar');
+    if (bm) bm.onclick = () => {
+      alvo.paraRevisar = true;
+      alvo.atualizado = Date.now();
+      DB.salvarProduto(alvo).then(() => {
+        alvoProduto = null; toast('Marcado para o Leonardo revisar'); gReset(); ir('produtos');
+      });
+    };
+    $('#g-voltar').onclick = () => { guia.cod = null; guia.prod = null; renderGuia(); };
   }
 
   /* ---------------- busca NCM ---------------- */
@@ -708,6 +928,7 @@
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
     BASE.carregar((m, p) => { msg.textContent = m; bar.style.width = p + '%'; })
+      .then(() => carregarProdutos())
       .then(() => DB.todaCfg())
       .then(salva => {
         cfg = Object.assign({}, CUSTOS.CFG_PADRAO, salva);
@@ -745,7 +966,15 @@
     $('#btn-export-json').onclick = exportarJson;
     $('#btn-export-csv').onclick = exportarCsv;
     $('#imp-json').onchange = (e) => { if (e.target.files[0]) importarJson(e.target.files[0]); e.target.value = ''; };
-    // ncm
+    // ncm: alterna entre o assistente guiado e a busca por texto
+    $$('#ncm-modo button').forEach(b => b.onclick = () => {
+      $$('#ncm-modo button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      const g = b.dataset.v === 'guiado';
+      $('#m-guiado').hidden = !g;
+      $('#m-busca').hidden = g;
+      if (g) renderGuia();
+    });
     $('#q').oninput = buscarNcmDebounce;
     // custos
     $('#c-produto').onchange = renderCustos;

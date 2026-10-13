@@ -24,6 +24,19 @@ gravada no aparelho.
 
 Baixado em **13/10/2026**. Total: ~7 MB no aparelho.
 
+## Como as três pessoas usam
+
+**Quem não sabe comex (modo Guiado)** — categoria → produto → material. Três
+toques e sai NCM, imposto, alerta de barreira em português claro e custo por
+peça. São 126 produtos das Fases 2 e 3, com 305 variações de material, todos
+com o código conferido contra a tabela oficial. Quando o código ainda tem
+subdivisões, o app desce na árvore da NCM e usa o texto da própria Receita
+como pergunta. O que não estiver no dicionário vira "marcar para o Leonardo" —
+o app não chuta.
+
+**Quem sabe comex (modo Buscar por texto)** — busca livre em português ou
+inglês sobre os 10.516 códigos, com os candidatos ranqueados.
+
 ## As cinco telas
 
 - **Capturar** — foto pela câmera nativa, preço FOB, MOQ, peso, CBM, estande,

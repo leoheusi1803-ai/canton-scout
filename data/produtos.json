@@ -1,0 +1,561 @@
+{
+  "meta": {
+    "gerado": "2026-10-13",
+    "nota": "Dicionario de produtos da Canton Fair Fases 2 e 3. O codigo pode ter 6 ou 8 digitos: com 6, o app desce na arvore oficial da NCM e usa o texto da propria tabela como pergunta seguinte."
+  },
+  "categorias": [
+    { "id": "mesa",   "nome": "Mesa e cozinha",        "ico": "🍽️" },
+    { "id": "casa",   "nome": "Decoração e casa",      "ico": "🏠" },
+    { "id": "moveis", "nome": "Móveis",                "ico": "🪑" },
+    { "id": "ilum",   "nome": "Iluminação",            "ico": "💡" },
+    { "id": "eletro", "nome": "Eletro e eletrônicos",  "ico": "🔌" },
+    { "id": "textil", "nome": "Cama, mesa e banho",    "ico": "🛏️" },
+    { "id": "vest",   "nome": "Roupas",                "ico": "👕" },
+    { "id": "calc",   "nome": "Calçados",              "ico": "👟" },
+    { "id": "aces",   "nome": "Bolsas e acessórios",   "ico": "👜" },
+    { "id": "brinq",  "nome": "Brinquedos e festa",    "ico": "🧸" },
+    { "id": "escr",   "nome": "Escritório e papelaria","ico": "✏️" },
+    { "id": "saude",  "nome": "Saúde e beleza",        "ico": "💄" },
+    { "id": "ferr",   "nome": "Ferramentas e ferragens","ico": "🔧" },
+    { "id": "alim",   "nome": "Alimentos",             "ico": "☕" }
+  ],
+  "produtos": [
+
+    { "n": "Caneca / xícara", "cat": "mesa", "alt": ["mug", "coffee mug", "cup", "caneca", "xicara", "chavena"],
+      "q": "De que material é?",
+      "op": [["Porcelana", "691110"], ["Cerâmica, grés ou faiança", "69120000"], ["Plástico", "39241000"],
+             ["Vidro", "70133700"], ["Aço inoxidável", "73239300"], ["Alumínio", "76151000"]] },
+
+    { "n": "Prato", "cat": "mesa", "alt": ["plate", "dish", "prato"],
+      "q": "De que material é?",
+      "op": [["Porcelana", "691110"], ["Cerâmica, grés ou faiança", "69120000"], ["Plástico ou melamina", "39241000"],
+             ["Vidro", "70134900"], ["Aço inoxidável", "73239300"], ["Bambu ou madeira", "441911"]] },
+
+    { "n": "Tigela / bowl", "cat": "mesa", "alt": ["bowl", "tigela", "cumbuca"],
+      "q": "De que material é?",
+      "op": [["Porcelana", "691110"], ["Cerâmica, grés ou faiança", "69120000"], ["Plástico ou melamina", "39241000"],
+             ["Vidro", "70134900"], ["Aço inoxidável", "73239300"]] },
+
+    { "n": "Jogo de jantar / aparelho de mesa", "cat": "mesa", "alt": ["dinner set", "tableware set", "jogo de jantar", "aparelho de jantar"],
+      "q": "De que material é?",
+      "op": [["Porcelana", "69111010"], ["Cerâmica, grés ou faiança", "69120000"], ["Vidro", "70134900"]] },
+
+    { "n": "Copo", "cat": "mesa", "alt": ["glass", "tumbler", "copo"],
+      "q": "De que material é?",
+      "op": [["Vidro comum", "70133700"], ["Cristal de chumbo", "70133300"], ["Plástico", "39241000"],
+             ["Aço inoxidável", "73239300"]] },
+
+    { "n": "Taça (com pé)", "cat": "mesa", "alt": ["wine glass", "goblet", "stemware", "taca"],
+      "q": "De que material é?",
+      "op": [["Vidro comum", "70132800"], ["Cristal de chumbo", "70132200"]] },
+
+    { "n": "Garrafa térmica / copo térmico", "cat": "mesa", "alt": ["thermos", "vacuum flask", "tumbler", "garrafa termica"],
+      "q": "Confirma que é recipiente isotérmico a vácuo?",
+      "op": [["Sim, garrafa ou copo térmico", "961700"], ["Não, garrafa comum de plástico", "39249000"],
+             ["Não, garrafa comum de aço inox", "73239300"]] },
+
+    { "n": "Panela / frigideira", "cat": "mesa", "alt": ["pot", "pan", "frying pan", "cookware", "panela", "frigideira"],
+      "q": "De que material é?",
+      "op": [["Aço inoxidável", "73239300"], ["Alumínio (inclusive antiaderente)", "76151000"],
+             ["Ferro fundido", "73239100"], ["Vidro refratário", "70134900"]] },
+
+    { "n": "Chaleira (sem eletricidade)", "cat": "mesa", "alt": ["kettle", "chaleira"],
+      "q": "De que material é?",
+      "op": [["Aço inoxidável", "73239300"], ["Alumínio", "76151000"], ["Esmaltada / ferro", "73239900"]] },
+
+    { "n": "Bule / jogo de chá", "cat": "mesa", "alt": ["teapot", "tea set", "bule"],
+      "q": "De que material é?",
+      "op": [["Porcelana", "691110"], ["Cerâmica, grés ou faiança", "69120000"], ["Vidro", "70134900"],
+             ["Aço inoxidável", "73239300"]] },
+
+    { "n": "Talheres (garfo, faca de mesa, colher)", "cat": "mesa", "alt": ["cutlery", "flatware", "fork", "spoon", "talher"],
+      "q": "Como está apresentado?",
+      "op": [["Jogo / sortido completo", "82152000"], ["Peças avulsas", "821599"]] },
+
+    { "n": "Faca de cozinha", "cat": "mesa", "alt": ["kitchen knife", "chef knife", "faca"],
+      "q": "Como está apresentada?",
+      "op": [["Jogo de facas sortido", "82111000"], ["Faca avulsa de lâmina fixa", "821191"],
+             ["Faca de lâmina móvel / canivete", "821193"]] },
+
+    { "n": "Tábua de corte", "cat": "mesa", "alt": ["cutting board", "chopping board", "tabua de corte"],
+      "q": "De que material é?",
+      "op": [["Bambu", "44191100"], ["Outra madeira", "441990"], ["Plástico", "39241000"], ["Vidro", "70134900"]] },
+
+    { "n": "Pote / recipiente para mantimentos", "cat": "mesa", "alt": ["storage jar", "food container", "pote", "tupperware"],
+      "q": "De que material é?",
+      "op": [["Plástico", "39241000"], ["Vidro", "70134900"], ["Aço inoxidável", "73239300"],
+             ["Cerâmica", "69120000"]] },
+
+    { "n": "Forma de bolo / assadeira", "cat": "mesa", "alt": ["bakeware", "baking pan", "cake mold", "forma", "assadeira"],
+      "q": "De que material é?",
+      "op": [["Aço ou ferro", "73239900"], ["Alumínio", "76151000"], ["Silicone", "39241000"], ["Vidro refratário", "70134900"]] },
+
+    { "n": "Utensílio manual (ralador, abridor, descascador, espremedor)", "cat": "mesa",
+      "alt": ["grater", "opener", "peeler", "whisk", "kitchen gadget", "ralador", "abridor", "descascador"],
+      "q": "É ferramenta manual de cozinha, sem motor?",
+      "op": [["Sim, utensílio manual de metal", "82055100"], ["Não, é todo de plástico", "39249000"]] },
+
+    { "n": "Guardanapo / toalha de mesa de papel", "cat": "mesa", "alt": ["napkin", "paper towel", "guardanapo"],
+      "q": "É de papel ou de tecido?",
+      "op": [["Papel", "481820"], ["Tecido de algodão", "63025100"], ["Tecido sintético", "63025300"]] },
+
+    { "n": "Vaso decorativo", "cat": "casa", "alt": ["vase", "flower pot", "vaso"],
+      "q": "De que material é?",
+      "op": [["Cerâmica ou porcelana", "691390"], ["Vidro", "70139900"], ["Plástico", "39264000"],
+             ["Metal comum", "83062900"]] },
+
+    { "n": "Estatueta / objeto de ornamento", "cat": "casa", "alt": ["figurine", "ornament", "statue", "estatueta", "enfeite"],
+      "q": "De que material é?",
+      "op": [["Cerâmica ou porcelana", "691390"], ["Resina ou plástico", "39264000"], ["Vidro", "70139900"],
+             ["Metal comum", "83062900"], ["Madeira", "442019"]] },
+
+    { "n": "Porta-retrato", "cat": "casa", "alt": ["photo frame", "picture frame", "porta retrato", "moldura"],
+      "q": "De que material é?",
+      "op": [["Madeira", "441490"], ["Metal comum", "83063000"], ["Plástico", "39264000"], ["Vidro", "70139900"]] },
+
+    { "n": "Espelho decorativo", "cat": "casa", "alt": ["mirror", "espelho"],
+      "q": "Tem moldura?",
+      "op": [["Sim, emoldurado", "70099200"], ["Não, sem moldura", "70099100"]] },
+
+    { "n": "Relógio de parede / despertador", "cat": "casa", "alt": ["wall clock", "alarm clock", "relogio de parede", "despertador"],
+      "q": "Como funciona?",
+      "op": [["A pilha ou elétrico", "91052100"], ["A corda / mecânico", "91052900"]] },
+
+    { "n": "Vela", "cat": "casa", "alt": ["candle", "scented candle", "vela"],
+      "q": "Confirma que é vela de cera ou parafina?",
+      "op": [["Sim", "34060000"], ["Não, é vela elétrica / LED", "940542"]] },
+
+    { "n": "Castiçal / porta-vela", "cat": "casa", "alt": ["candle holder", "candlestick", "casticcal", "porta vela"],
+      "q": "De que material é?",
+      "op": [["Metal comum", "83062900"], ["Vidro", "70139900"], ["Cerâmica", "691390"], ["Madeira", "442019"]] },
+
+    { "n": "Almofada", "cat": "casa", "alt": ["cushion", "pillow", "almofada"],
+      "q": "Está recheada?",
+      "op": [["Sim, almofada pronta", "94049000"], ["Não, só a capa (algodão)", "63049100"],
+             ["Não, só a capa (sintético)", "630492"]] },
+
+    { "n": "Cortina", "cat": "casa", "alt": ["curtain", "drape", "cortina"],
+      "q": "De que fibra é?",
+      "op": [["Sintética", "63039200"], ["Algodão", "63039100"], ["Outra fibra", "63039900"]] },
+
+    { "n": "Tapete", "cat": "casa", "alt": ["rug", "carpet", "mat", "tapete"],
+      "q": "Como é feito?",
+      "op": [["Tufado", "5703"], ["Aveludado / felpudo tecido", "5702"], ["Outros tapetes", "57050000"]] },
+
+    { "n": "Cesto / organizador", "cat": "casa", "alt": ["basket", "organizer", "storage box", "cesto", "organizador"],
+      "q": "De que material é?",
+      "op": [["Bambu", "46021100"], ["Vime, rattan ou fibra vegetal", "460219"], ["Plástico", "39249000"],
+             ["Têxtil", "63079090"]] },
+
+    { "n": "Lixeira", "cat": "casa", "alt": ["trash can", "bin", "dustbin", "lixeira"],
+      "q": "De que material é?",
+      "op": [["Plástico", "39249000"], ["Aço inoxidável", "73239300"], ["Bambu ou vime", "460219"]] },
+
+    { "n": "Cabide", "cat": "casa", "alt": ["hanger", "clothes hanger", "cabide"],
+      "q": "De que material é?",
+      "op": [["Plástico", "39249000"], ["Madeira", "44219"], ["Metal", "73269090"]] },
+
+    { "n": "Guarda-chuva / sombrinha", "cat": "casa", "alt": ["umbrella", "parasol", "guarda chuva", "sombrinha"],
+      "q": "Confirma que é guarda-chuva?",
+      "op": [["Sim", "660199"]] },
+
+    { "n": "Cadeira", "cat": "moveis", "alt": ["chair", "dining chair", "cadeira"],
+      "q": "De que material é a estrutura?",
+      "op": [["Madeira, estofada", "94016100"], ["Madeira, sem estofado", "94016900"],
+             ["Metal, estofada", "94017100"], ["Metal, sem estofado", "94017900"],
+             ["Plástico", "94018000"]] },
+
+    { "n": "Banco / banqueta", "cat": "moveis", "alt": ["stool", "bar stool", "bench", "banqueta", "banco"],
+      "q": "De que material é a estrutura?",
+      "op": [["Madeira", "94016900"], ["Metal", "94017900"], ["Plástico", "94018000"]] },
+
+    { "n": "Sofá / poltrona", "cat": "moveis", "alt": ["sofa", "couch", "armchair", "sofa", "poltrona"],
+      "q": "De que material é a estrutura?",
+      "op": [["Madeira, estofado", "94016100"], ["Metal, estofado", "94017100"]] },
+
+    { "n": "Mesa", "cat": "moveis", "alt": ["table", "dining table", "desk", "mesa", "escrivaninha"],
+      "q": "De que material é?",
+      "op": [["Madeira", "94036000"], ["Metal", "940320"], ["Plástico", "94037000"],
+             ["Bambu ou rattan", "940382"]] },
+
+    { "n": "Armário / estante / cômoda", "cat": "moveis", "alt": ["cabinet", "shelf", "wardrobe", "bookcase", "armario", "estante"],
+      "q": "Para onde e de que material?",
+      "op": [["Madeira, para quarto", "94035000"], ["Madeira, outros ambientes", "94036000"],
+             ["Metal", "940320"], ["Plástico", "94037000"]] },
+
+    { "n": "Colchão", "cat": "moveis", "alt": ["mattress", "colchao"],
+      "q": "De que é o enchimento?",
+      "op": [["Espuma de plástico ou borracha", "94042100"], ["Molas ou outro", "94042900"]] },
+
+    { "n": "Travesseiro / edredom", "cat": "moveis", "alt": ["pillow", "duvet", "quilt", "comforter", "travesseiro", "edredom"],
+      "q": "O que é?",
+      "op": [["Edredom / colcha acolchoada", "94044000"], ["Travesseiro / almofada", "94049000"]] },
+
+    { "n": "Luminária de mesa ou de chão", "cat": "ilum", "alt": ["table lamp", "floor lamp", "desk lamp", "abajur", "luminaria"],
+      "q": "A fonte de luz é LED?",
+      "op": [["Sim, só LED", "94052100"], ["Não, outra fonte", "94052900"]] },
+
+    { "n": "Lustre / plafon / luminária de teto", "cat": "ilum", "alt": ["chandelier", "ceiling lamp", "pendant light", "lustre", "plafon"],
+      "q": "A fonte de luz é LED?",
+      "op": [["Sim, só LED", "940511"], ["Não, outra fonte", "940519"]] },
+
+    { "n": "Lâmpada LED", "cat": "ilum", "alt": ["led bulb", "led lamp", "lampada led"],
+      "q": "Confirma que é a lâmpada em si, não a luminária?",
+      "op": [["Sim, lâmpada ou tubo de LED", "85395200"], ["Não, é a luminária completa", "940542"]] },
+
+    { "n": "Fita LED / luminária decorativa LED", "cat": "ilum", "alt": ["led strip", "string lights", "fairy lights", "fita led", "pisca pisca"],
+      "q": "Para que serve?",
+      "op": [["Iluminação em geral, LED", "94054200"], ["Enfeite de árvore de Natal", "94053100"]] },
+
+    { "n": "Lanterna / luminária portátil a pilha", "cat": "ilum", "alt": ["flashlight", "torch", "lanterna"],
+      "q": "Confirma que funciona com pilha ou bateria própria?",
+      "op": [["Sim", "851310"]] },
+
+    { "n": "Ventilador", "cat": "eletro", "alt": ["fan", "table fan", "ceiling fan", "ventilador"],
+      "q": "Que tipo?",
+      "op": [["De mesa", "84145110"], ["De teto", "84145120"], ["Outro (parede, coluna, torre)", "84145190"]] },
+
+    { "n": "Liquidificador / processador / mixer", "cat": "eletro", "alt": ["blender", "food processor", "mixer", "liquidificador", "processador"],
+      "q": "Confirma que é eletrodoméstico com motor próprio?",
+      "op": [["Sim", "850940"]] },
+
+    { "n": "Aspirador de pó", "cat": "eletro", "alt": ["vacuum cleaner", "robot vacuum", "aspirador"],
+      "q": "Tem motor elétrico próprio?",
+      "op": [["Sim, potência até 1500 W e saco até 20 L", "85081100"], ["Sim, outros", "85081900"]] },
+
+    { "n": "Air fryer / forno elétrico / fogão elétrico", "cat": "eletro", "alt": ["air fryer", "electric oven", "cooker", "fritadeira", "forno eletrico"],
+      "q": "Confirma que é aparelho de cozimento elétrico?",
+      "op": [["Sim", "85166000"]] },
+
+    { "n": "Cafeteira / chaleira elétrica", "cat": "eletro", "alt": ["coffee maker", "electric kettle", "cafeteira", "chaleira eletrica"],
+      "q": "O que é?",
+      "op": [["Cafeteira ou chaleira elétrica", "85167100"], ["Torradeira", "85167200"],
+             ["Outro aparelho eletrotérmico", "851679"]] },
+
+    { "n": "Ferro de passar", "cat": "eletro", "alt": ["iron", "steam iron", "ferro de passar"],
+      "q": "Confirma que é ferro elétrico de passar roupa?",
+      "op": [["Sim", "85164000"]] },
+
+    { "n": "Secador de cabelo / chapinha", "cat": "eletro", "alt": ["hair dryer", "straightener", "curling iron", "secador", "chapinha"],
+      "q": "O que é?",
+      "op": [["Secador de cabelo", "85163100"], ["Chapinha, modelador, babyliss", "85163200"]] },
+
+    { "n": "Caixa de som / alto-falante", "cat": "eletro", "alt": ["speaker", "bluetooth speaker", "soundbar", "caixa de som", "alto falante"],
+      "q": "Como é montado?",
+      "op": [["Um alto-falante no gabinete", "85182100"], ["Vários alto-falantes no mesmo gabinete", "85182200"],
+             ["Alto-falante sem gabinete", "851829"]] },
+
+    { "n": "Fone de ouvido", "cat": "eletro", "alt": ["headphone", "earphone", "earbuds", "fone de ouvido"],
+      "q": "Confirma que é fone, com ou sem microfone?",
+      "op": [["Sim", "85183000"]] },
+
+    { "n": "Carregador / fonte de alimentação", "cat": "eletro", "alt": ["charger", "power adapter", "carregador", "fonte"],
+      "q": "Confirma que é carregador ou fonte de energia?",
+      "op": [["Sim", "850440"]] },
+
+    { "n": "Power bank / bateria recarregável", "cat": "eletro", "alt": ["power bank", "battery", "rechargeable", "bateria", "powerbank"],
+      "q": "Que tipo?",
+      "op": [["Recarregável de íon de lítio", "85076000"], ["Pilha descartável alcalina", "850610"]] },
+
+    { "n": "Cabo USB / cabo elétrico", "cat": "eletro", "alt": ["usb cable", "charging cable", "cable", "cabo"],
+      "q": "Para que tensão?",
+      "op": [["Até 1000 V, com conectores", "85444200"], ["Até 1000 V, sem conectores", "85444900"]] },
+
+    { "n": "Toalha de banho / rosto", "cat": "textil", "alt": ["towel", "bath towel", "toalha"],
+      "q": "De que fibra é?",
+      "op": [["Algodão atoalhado", "63026000"], ["Outra fibra", "630293"]] },
+
+    { "n": "Jogo de cama / lençol", "cat": "textil", "alt": ["bedding", "bed sheet", "bed set", "lencol", "jogo de cama"],
+      "q": "De que fibra e acabamento?",
+      "op": [["Algodão, estampado", "63022100"], ["Algodão, liso", "63023100"],
+             ["Sintético, estampado", "63022200"], ["Sintético, liso", "63023200"]] },
+
+    { "n": "Cobertor / manta", "cat": "textil", "alt": ["blanket", "throw", "fleece", "cobertor", "manta"],
+      "q": "De que fibra é?",
+      "op": [["Sintética", "63014000"], ["Algodão", "63013000"], ["Lã", "63012000"]] },
+
+    { "n": "Toalha de mesa de tecido", "cat": "textil", "alt": ["tablecloth", "table runner", "toalha de mesa"],
+      "q": "De que fibra é?",
+      "op": [["Algodão", "63025100"], ["Sintética", "63025300"]] },
+
+    { "n": "Camiseta", "cat": "vest", "alt": ["t-shirt", "tshirt", "tee", "camiseta"],
+      "q": "De que fibra é a malha?",
+      "op": [["Algodão", "61091000"], ["Sintética ou outra", "610990"]] },
+
+    { "n": "Camisa social / camisa de tecido", "cat": "vest", "alt": ["shirt", "dress shirt", "blouse", "camisa"],
+      "q": "Para quem e de que fibra?",
+      "op": [["Masculina, algodão", "62052000"], ["Masculina, sintética", "620530"],
+             ["Feminina, algodão", "62062000"], ["Feminina, sintética", "620640"]] },
+
+    { "n": "Blusa / camiseta feminina de malha", "cat": "vest", "alt": ["ladies top", "blouse", "knit top", "blusa"],
+      "q": "De que fibra é a malha?",
+      "op": [["Algodão", "61061000"], ["Sintética", "61062000"]] },
+
+    { "n": "Vestido", "cat": "vest", "alt": ["dress", "vestido"],
+      "q": "É de malha e de que fibra?",
+      "op": [["Malha, algodão", "61044200"], ["Malha, sintética", "61044300"],
+             ["Tecido, algodão", "62044200"], ["Tecido, sintético", "62044300"]] },
+
+    { "n": "Calça / bermuda", "cat": "vest", "alt": ["pants", "trousers", "jeans", "shorts", "calca", "bermuda"],
+      "q": "Para quem e de que fibra?",
+      "op": [["Masculina, algodão (inclusive jeans)", "62034200"], ["Masculina, sintética", "62034300"],
+             ["Feminina, algodão (inclusive jeans)", "62046200"], ["Feminina, sintética", "62046300"]] },
+
+    { "n": "Moletom / blusa de frio de malha", "cat": "vest", "alt": ["hoodie", "sweatshirt", "sweater", "pullover", "moletom", "pulover"],
+      "q": "De que fibra é?",
+      "op": [["Algodão", "61102000"], ["Fibras sintéticas ou artificiais", "61103000"], ["Lã", "611011"]] },
+
+    { "n": "Jaqueta / casaco", "cat": "vest", "alt": ["jacket", "coat", "parka", "jaqueta", "casaco"],
+      "q": "Para quem e como é feito?",
+      "op": [["Masculina, tecido (não malha)", "6201"], ["Feminina, tecido (não malha)", "6202"],
+             ["Masculina, de malha", "6101"], ["Feminina, de malha", "6102"]] },
+
+    { "n": "Meia", "cat": "vest", "alt": ["socks", "sock", "meia"],
+      "q": "De que fibra é?",
+      "op": [["Algodão", "61159500"], ["Fibras sintéticas", "61159600"], ["Outra fibra", "61159900"]] },
+
+    { "n": "Roupa íntima", "cat": "vest", "alt": ["underwear", "panties", "briefs", "bra", "cueca", "calcinha", "sutia"],
+      "q": "O que é?",
+      "op": [["Sutiã", "62121000"], ["Cueca masculina de malha", "610711"],
+             ["Calcinha de malha", "610821"]] },
+
+    { "n": "Pijama", "cat": "vest", "alt": ["pajamas", "sleepwear", "pijama"],
+      "q": "Para quem e de que fibra?",
+      "op": [["Masculino, malha de algodão", "61072100"], ["Feminino, malha de algodão", "61083100"]] },
+
+    { "n": "Roupa de bebê", "cat": "vest", "alt": ["baby clothes", "babywear", "roupa de bebe"],
+      "q": "De que fibra é a malha?",
+      "op": [["Algodão", "61112000"], ["Sintética", "61113000"]] },
+
+    { "n": "Tênis esportivo", "cat": "calc", "alt": ["sneaker", "sports shoe", "running shoe", "tenis"],
+      "q": "De que é a parte de cima (cabedal)?",
+      "op": [["Matéria têxtil, sola de borracha ou plástico", "64041100"],
+             ["Couro, sola de borracha ou plástico", "640319"]] },
+
+    { "n": "Sapato / sapatilha", "cat": "calc", "alt": ["shoe", "loafer", "flats", "sapato", "sapatilha"],
+      "q": "De que é a parte de cima (cabedal)?",
+      "op": [["Couro natural", "640399"], ["Plástico ou borracha", "640299"], ["Matéria têxtil", "640419"]] },
+
+    { "n": "Sandália / chinelo", "cat": "calc", "alt": ["sandal", "slipper", "flip flop", "sandalia", "chinelo"],
+      "q": "De que material é?",
+      "op": [["Todo de plástico ou borracha, tiras", "64022000"], ["Outro de plástico ou borracha", "640299"],
+             ["Couro", "640399"], ["Têxtil", "640419"]] },
+
+    { "n": "Bota", "cat": "calc", "alt": ["boot", "boots", "bota"],
+      "q": "De que é a parte de cima (cabedal)?",
+      "op": [["Couro, cobre o tornozelo", "640391"], ["Plástico ou borracha", "640291"],
+             ["Têxtil", "640419"]] },
+
+    { "n": "Mochila", "cat": "aces", "alt": ["backpack", "rucksack", "school bag", "mochila"],
+      "q": "De que é a superfície externa?",
+      "op": [["Plástico ou matéria têxtil", "42029200"], ["Couro natural", "42029100"]] },
+
+    { "n": "Bolsa feminina", "cat": "aces", "alt": ["handbag", "purse", "shoulder bag", "bolsa"],
+      "q": "De que é a superfície externa?",
+      "op": [["Couro natural", "42022100"], ["Plástico ou matéria têxtil", "420222"]] },
+
+    { "n": "Mala de viagem", "cat": "aces", "alt": ["suitcase", "luggage", "travel bag", "mala"],
+      "q": "De que é a superfície externa?",
+      "op": [["Couro natural", "42021100"], ["Plástico rígido", "42021210"], ["Matéria têxtil", "42021220"]] },
+
+    { "n": "Carteira / porta-cartão", "cat": "aces", "alt": ["wallet", "card holder", "carteira"],
+      "q": "De que é a superfície externa?",
+      "op": [["Couro natural", "42023100"], ["Plástico ou matéria têxtil", "42023200"]] },
+
+    { "n": "Cinto", "cat": "aces", "alt": ["belt", "cinto"],
+      "q": "De que material é?",
+      "op": [["Couro natural", "42033000"], ["Plástico", "39262000"], ["Têxtil", "63079090"]] },
+
+    { "n": "Boné / chapéu", "cat": "aces", "alt": ["cap", "hat", "beanie", "bone", "chapeu"],
+      "q": "Como é feito?",
+      "op": [["Boné ou chapéu de malha ou confeccionado", "650500"], ["Chapéu de palha ou fibra entrançada", "6504"]] },
+
+    { "n": "Óculos de sol", "cat": "aces", "alt": ["sunglasses", "oculos de sol"],
+      "q": "Confirma que é óculos de sol?",
+      "op": [["Sim", "90041000"], ["Não, é armação sem lente de grau", "900311"]] },
+
+    { "n": "Bijuteria (brinco, colar, pulseira, anel)", "cat": "aces", "alt": ["jewelry", "jewellery", "earring", "necklace", "bracelet", "ring", "bijuteria"],
+      "q": "De que material é?",
+      "op": [["Metal comum (não precioso)", "711719"], ["Outros materiais", "71179000"]] },
+
+    { "n": "Relógio de pulso", "cat": "aces", "alt": ["watch", "wristwatch", "relogio de pulso"],
+      "q": "Como funciona o mostrador?",
+      "op": [["Eletrônico, mostrador mecânico", "910211"], ["Eletrônico, mostrador digital", "910212"],
+             ["Mecânico (a corda)", "910221"]] },
+
+    { "n": "Boneca / boneco", "cat": "brinq", "alt": ["doll", "action figure", "boneca", "boneco"],
+      "q": "Tem mecanismo?",
+      "op": [["Sim, a corda ou elétrico", "95030021"], ["Não, boneco simples", "950300"]] },
+
+    { "n": "Carrinho, triciclo, patinete de brinquedo", "cat": "brinq", "alt": ["toy car", "tricycle", "scooter", "ride on", "carrinho", "patinete"],
+      "q": "Confirma que é brinquedo de rodas para criança?",
+      "op": [["Sim", "95030010"]] },
+
+    { "n": "Blocos de montar / brinquedo de construção", "cat": "brinq", "alt": ["building blocks", "lego", "construction toy", "blocos"],
+      "q": "Confirma que é conjunto de montar?",
+      "op": [["Sim", "95030060"]] },
+
+    { "n": "Pelúcia", "cat": "brinq", "alt": ["plush", "stuffed toy", "teddy bear", "pelucia"],
+      "q": "Confirma que é brinquedo de pelúcia?",
+      "op": [["Sim", "950300"]] },
+
+    { "n": "Quebra-cabeça", "cat": "brinq", "alt": ["puzzle", "jigsaw", "quebra cabeca"],
+      "q": "Confirma que é quebra-cabeça?",
+      "op": [["Sim", "950430"]] },
+
+    { "n": "Jogo de tabuleiro / carta", "cat": "brinq", "alt": ["board game", "card game", "jogo de tabuleiro", "baralho"],
+      "q": "O que é?",
+      "op": [["Cartas de jogar", "95044000"], ["Outro jogo de salão", "950490"]] },
+
+    { "n": "Bola", "cat": "brinq", "alt": ["ball", "football", "soccer ball", "bola"],
+      "q": "Que tipo?",
+      "op": [["Bola inflável de esporte", "95066200"], ["Outra bola", "95066900"]] },
+
+    { "n": "Enfeite de Natal", "cat": "brinq", "alt": ["christmas", "christmas ornament", "xmas", "natal", "enfeite de natal"],
+      "q": "Confirma que é artigo de Natal?",
+      "op": [["Sim", "95051000"]] },
+
+    { "n": "Artigo de festa / balão", "cat": "brinq", "alt": ["party supplies", "balloon", "party", "festa", "balao"],
+      "q": "Confirma que é artigo de festa ou carnaval?",
+      "op": [["Sim", "95059000"]] },
+
+    { "n": "Caneta esferográfica", "cat": "escr", "alt": ["ballpoint pen", "pen", "caneta"],
+      "q": "Que tipo de caneta?",
+      "op": [["Esferográfica", "96081000"], ["Hidrográfica / marcador", "960820"],
+             ["Tinteiro", "960830"]] },
+
+    { "n": "Lápis", "cat": "escr", "alt": ["pencil", "colored pencil", "lapis"],
+      "q": "Confirma que é lápis com mina?",
+      "op": [["Sim, grafite ou colorido", "96091000"], ["Não, é lapiseira", "96084000"]] },
+
+    { "n": "Caderno / bloco", "cat": "escr", "alt": ["notebook", "notepad", "caderno", "bloco"],
+      "q": "Confirma que é caderno ou bloco de papel?",
+      "op": [["Sim", "48202000"], ["Não, é agenda ou livro de registro", "48201000"]] },
+
+    { "n": "Pasta / fichário", "cat": "escr", "alt": ["folder", "binder", "file", "pasta", "fichario"],
+      "q": "De que material é?",
+      "op": [["Papel ou cartão", "48203000"], ["Plástico", "39261000"]] },
+
+    { "n": "Tesoura", "cat": "escr", "alt": ["scissors", "tesoura"],
+      "q": "Confirma que é tesoura?",
+      "op": [["Sim", "82130000"]] },
+
+    { "n": "Calculadora", "cat": "escr", "alt": ["calculator", "calculadora"],
+      "q": "Confirma que é calculadora eletrônica?",
+      "op": [["Sim", "847010"]] },
+
+    { "n": "Fita adesiva", "cat": "escr", "alt": ["tape", "adhesive tape", "fita adesiva", "durex"],
+      "q": "Qual a largura?",
+      "op": [["Até 20 cm", "391910"], ["Mais de 20 cm", "391990"]] },
+
+    { "n": "Batom / maquiagem para lábios", "cat": "saude", "alt": ["lipstick", "lip gloss", "batom", "gloss"],
+      "q": "Confirma que é produto para os lábios?",
+      "op": [["Sim", "33041000"]] },
+
+    { "n": "Maquiagem para olhos", "cat": "saude", "alt": ["eyeshadow", "mascara", "eyeliner", "sombra", "rimel"],
+      "q": "Confirma que é produto para os olhos?",
+      "op": [["Sim", "330420"]] },
+
+    { "n": "Creme / loção para pele", "cat": "saude", "alt": ["cream", "lotion", "moisturizer", "skincare", "creme", "hidratante"],
+      "q": "Para que serve?",
+      "op": [["Cuidado da pele em geral", "330499"], ["Protetor solar", "330499"]] },
+
+    { "n": "Esmalte / produto para unhas", "cat": "saude", "alt": ["nail polish", "manicure", "esmalte", "unha"],
+      "q": "Confirma que é produto para unhas?",
+      "op": [["Sim", "33043000"]] },
+
+    { "n": "Xampu / condicionador", "cat": "saude", "alt": ["shampoo", "conditioner", "hair care", "xampu", "condicionador"],
+      "q": "O que é?",
+      "op": [["Xampu", "33051000"], ["Outro produto capilar", "330590"]] },
+
+    { "n": "Perfume / colônia", "cat": "saude", "alt": ["perfume", "fragrance", "cologne", "perfume", "colonia"],
+      "q": "Confirma que é perfume ou água de colônia?",
+      "op": [["Sim", "330300"]] },
+
+    { "n": "Sabonete", "cat": "saude", "alt": ["soap", "bar soap", "sabonete"],
+      "q": "Em que forma?",
+      "op": [["Barra ou pedaço, para toucador", "340111"], ["Líquido ou creme", "340130"]] },
+
+    { "n": "Escova de dente", "cat": "saude", "alt": ["toothbrush", "escova de dente"],
+      "q": "Confirma que é escova de dente?",
+      "op": [["Sim", "96032100"]] },
+
+    { "n": "Escova de cabelo / pincel de maquiagem", "cat": "saude", "alt": ["hair brush", "makeup brush", "escova de cabelo", "pincel"],
+      "q": "Confirma que é escova ou pincel de toucador?",
+      "op": [["Sim", "96032900"]] },
+
+    { "n": "Pente", "cat": "saude", "alt": ["comb", "pente"],
+      "q": "De que material é?",
+      "op": [["Borracha ou plástico", "96151100"], ["Outro material", "96151900"]] },
+
+    { "n": "Luva descartável", "cat": "saude", "alt": ["disposable gloves", "latex gloves", "nitrile", "luva"],
+      "q": "De que material é?",
+      "op": [["Borracha, para cirurgia", "40151200"], ["Plástico", "39262000"]] },
+
+    { "n": "Seringa / agulha", "cat": "saude", "alt": ["syringe", "needle", "seringa", "agulha"],
+      "q": "O que é?",
+      "op": [["Seringa", "901831"], ["Agulha tubular de metal", "901832"]] },
+
+    { "n": "Termômetro", "cat": "saude", "alt": ["thermometer", "termometro"],
+      "q": "Confirma que é termômetro?",
+      "op": [["Sim", "902519"]] },
+
+    { "n": "Fralda / absorvente", "cat": "saude", "alt": ["diaper", "sanitary pad", "fralda", "absorvente"],
+      "q": "O que é?",
+      "op": [["Absorvente ou tampão higiênico", "96190000"], ["Fralda", "96190000"]] },
+
+    { "n": "Cadeado", "cat": "ferr", "alt": ["padlock", "cadeado"],
+      "q": "Confirma que é cadeado?",
+      "op": [["Sim", "83011000"]] },
+
+    { "n": "Fechadura / maçaneta", "cat": "ferr", "alt": ["lock", "door handle", "knob", "fechadura", "macaneta"],
+      "q": "O que é?",
+      "op": [["Fechadura de porta", "83014000"], ["Puxador, maçaneta, guarnição", "830242"]] },
+
+    { "n": "Dobradiça", "cat": "ferr", "alt": ["hinge", "dobradica"],
+      "q": "Confirma que é dobradiça?",
+      "op": [["Sim", "83021000"]] },
+
+    { "n": "Alicate / chave de fenda / martelo", "cat": "ferr", "alt": ["pliers", "screwdriver", "hammer", "wrench", "hand tool", "alicate", "martelo", "chave de fenda"],
+      "q": "Qual ferramenta?",
+      "op": [["Alicate", "820320"], ["Chave de porcas", "8204"], ["Martelo", "82052000"],
+             ["Chave de fenda e outras manuais", "820540"]] },
+
+    { "n": "Furadeira / parafusadeira elétrica", "cat": "ferr", "alt": ["drill", "power tool", "furadeira", "parafusadeira"],
+      "q": "Como é alimentada?",
+      "op": [["Com motor elétrico, de uso manual", "846721"]] },
+
+    { "n": "Parafuso / prego", "cat": "ferr", "alt": ["screw", "nail", "bolt", "parafuso", "prego"],
+      "q": "O que é?",
+      "op": [["Parafuso para madeira", "73181200"], ["Outro parafuso rosqueado", "731815"],
+             ["Prego ou tacha", "731700"]] },
+
+    { "n": "Chá", "cat": "alim", "alt": ["tea", "green tea", "cha"],
+      "q": "Que tipo e embalagem?",
+      "op": [["Preto, embalagem até 3 kg", "09023000"], ["Verde, embalagem até 3 kg", "09021000"]] },
+
+    { "n": "Café", "cat": "alim", "alt": ["coffee", "cafe"],
+      "q": "Como está?",
+      "op": [["Torrado, não descafeinado", "09012100"], ["Solúvel / extrato", "210111"]] },
+
+    { "n": "Biscoito / bolacha", "cat": "alim", "alt": ["cookie", "biscuit", "cracker", "biscoito", "bolacha"],
+      "q": "É doce?",
+      "op": [["Sim, biscoito doce", "19053100"], ["Não, bolacha de água e sal", "190590"]] },
+
+    { "n": "Macarrão instantâneo / massa", "cat": "alim", "alt": ["instant noodle", "pasta", "noodle", "macarrao", "massa"],
+      "q": "Está recheado ou preparado?",
+      "op": [["Massa seca simples, sem recheio", "190219"], ["Preparado ou instantâneo", "19023000"]] },
+
+    { "n": "Chocolate", "cat": "alim", "alt": ["chocolate", "cocoa"],
+      "q": "Confirma que contém cacau?",
+      "op": [["Sim", "180690"]] },
+
+    { "n": "Bala / doce / goma", "cat": "alim", "alt": ["candy", "gummy", "sweets", "bala", "doce"],
+      "q": "O que é?",
+      "op": [["Goma de mascar", "170410"], ["Outro açucarado sem cacau", "170490"]] },
+
+    { "n": "Suplemento alimentar", "cat": "alim", "alt": ["supplement", "protein", "vitamin", "suplemento", "vitamina"],
+      "q": "Confirma que é preparação alimentícia / suplemento?",
+      "op": [["Sim", "210690"]] }
+  ]
+}
