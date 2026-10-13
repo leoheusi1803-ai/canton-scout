@@ -26,6 +26,13 @@ Baixado em **13/10/2026**. Total: ~7 MB no aparelho.
 
 ## Como as três pessoas usam
 
+**A foto** — ao fotografar, um MobileNet V2 roda DENTRO do aparelho (15 MB
+embarcados, zero rede) e sugere o produto. Um toque na sugestão e o app já
+vai para a pergunta de material. Nos testes acertou 89% das vezes em que
+sugeriu, e preferiu calar em 44% das imagens — sugerir com pouca confiança
+seria pior que não sugerir, porque a pessoa toca no primeiro item e leva uma
+NCM errada. Abaixo de 20% de confiança ele assume que não sabe.
+
 **Quem não sabe comex (modo Guiado)** — categoria → produto → material. Três
 toques e sai NCM, imposto, alerta de barreira em português claro e custo por
 peça. São 126 produtos das Fases 2 e 3, com 305 variações de material, todos

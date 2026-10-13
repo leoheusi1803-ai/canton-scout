@@ -80,7 +80,49 @@
       pendentes = pendentes.concat(novos);
       renderThumbs();
       toast(novos.length + (novos.length > 1 ? ' arquivos adicionados' : ' arquivo adicionado'));
+      const foto = novos.find(m => (m.tipo || '').startsWith('image'));
+      if (foto) reconhecer(foto.blob);
     });
+  }
+
+  /* ---------------- reconhecimento pela foto ----------------
+     Roda no próprio aparelho. Sugere, nunca decide: o material
+     continua sendo pergunta, porque é ele que define a NCM.     */
+  function reconhecer(blob) {
+    const el = $('#sugestao');
+    el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">
+      analisando a foto no aparelho…</p></div>`;
+    VISAO.carregar(m => {
+      el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">${esc(m)}</p></div>`;
+    })
+      .then(() => VISAO.classificar(blob, 3))
+      .then(({ sugestoes, bruto }) => {
+        if (!sugestoes.length) {
+          el.innerHTML = `<div class="card tight">
+            <p class="hint" style="margin:0">Não reconheci o produto nesta foto.
+            ${bruto.length ? 'O que mais pareceu: <b>' + esc(bruto[0].rot) + '</b>. ' : ''}
+            Dá no mesmo: use a aba <b>NCM</b> no modo Guiado e escolha pela categoria.</p></div>`;
+          return;
+        }
+        el.innerHTML = `<div class="card">
+          <h3 style="margin-bottom:9px">A foto parece ser</h3>
+          <div class="opcoes">` + sugestoes.map((s, i) => `
+            <button data-sug="${i}"><span>${esc(s.produto)}
+              <small>${Math.round(s.p * 100)}% de confiança · ${esc(s.rots.slice(0, 2).join(', '))}</small></span>
+              <span class="seta">›</span></button>`).join('') + `</div>
+          <p class="hint">Toque no certo para já sair a NCM, o imposto e o alerta.
+          Se nenhum estiver certo, ignore — o modelo reconhece o objeto, não a marca nem o material.</p></div>`;
+        el.querySelectorAll('[data-sug]').forEach(b => b.onclick = () => {
+          const s = sugestoes[+b.dataset.sug];
+          if (!$('#f-nome').value.trim()) $('#f-nome').value = s.produto.split(' / ')[0];
+          gIrParaProduto(s.produto);
+        });
+      })
+      .catch(e => {
+        el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">
+          Reconhecimento por foto indisponível (${esc(e.message)}).
+          Use a aba <b>NCM</b> no modo Guiado.</p></div>`;
+      });
   }
 
   function renderThumbs() {
@@ -103,6 +145,7 @@
   function limparForm() {
     ['f-nome', 'f-desc', 'f-preco', 'f-moq', 'f-qtd', 'f-peso', 'f-cbm', 'f-obs'].forEach(id => $('#' + id).value = '');
     pendentes = []; renderThumbs();
+    document.querySelector('#sugestao').innerHTML = '';
     // fornecedor/estande/contato ficam: normalmente são vários produtos do mesmo estande
   }
 
@@ -338,6 +381,20 @@
   }
 
   function gReset() { guia = { cat: null, prod: null, cod: null, caminho: [] }; renderGuia(); }
+
+  /* pula direto para a pergunta de material de um produto do dicionário —
+     é o atalho de quem veio pela sugestão da foto */
+  function gIrParaProduto(nome) {
+    if (!PRODUTOS) return;
+    const p = PRODUTOS.produtos.find(x => x.n === nome);
+    if (!p) { toast('Produto não encontrado no dicionário'); return; }
+    guia = { cat: p.cat, prod: p, cod: null, caminho: [] };
+    $$('#ncm-modo button').forEach(x => x.classList.toggle('on', x.dataset.v === 'guiado'));
+    $('#m-guiado').hidden = false;
+    $('#m-busca').hidden = true;
+    ir('ncm');
+    renderGuia();
+  }
 
   function renderGuia() {
     if (!PRODUTOS) { $('#g-corpo').innerHTML = '<p class="hint">carregando…</p>'; return; }
