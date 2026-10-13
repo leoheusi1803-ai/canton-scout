@@ -8,6 +8,7 @@ const CACHE = 'canton-scout-v1';
 const ESSENCIAL = [
   './',
   'index.html',
+  'guia.html',
   'app.css',
   'js/db.js',
   'js/dados.js',

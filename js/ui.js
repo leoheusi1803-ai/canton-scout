@@ -593,7 +593,7 @@
     ]).then(([reg, estado, chaves, persistido, esp]) => {
       const temSw = !!(reg && reg.active);
       const nCache = estado ? estado.total : chaves.length;
-      const esperado = estado ? estado.esperado : 12;
+      const esperado = estado ? estado.esperado : 13;
       const cacheOk = nCache >= esperado;
       const mb = esp && esp.usage ? (esp.usage / 1048576).toFixed(1) + ' MB usados' : '';
       const tudoOk = temSw && cacheOk;

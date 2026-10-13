@@ -126,3 +126,33 @@ data/anuencia.json      anuentes + LPCO         (4,1 MB)
 data/antidumping.json   medidas em vigor        ( 11 KB)
 build/                  extratores e servidor local
 ```
+
+---
+
+## Publicar no GitHub Pages
+
+A pasta já está pronta para ser servida em subpasta
+(`usuario.github.io/canton-scout/`) — isso foi testado: todos os caminhos são
+relativos e o escopo do service worker resolve certo. O `.nojekyll` evita que
+o GitHub processe os arquivos.
+
+1. Crie um repositório em <https://github.com/new>. Nome sugerido:
+   `canton-scout`. Pode ser **público ou privado** — o Pages funciona nos dois
+   em conta paga; em conta gratuita, o Pages exige repositório **público**.
+2. No terminal, dentro desta pasta:
+
+```bash
+git remote add origin https://github.com/SEU-USUARIO/canton-scout.git
+git branch -M main
+git push -u origin main
+```
+
+3. No repositório: **Settings → Pages → Source: Deploy from a branch →
+   branch `main`, pasta `/ (root)` → Save.**
+4. Espere 1 a 2 minutos. O endereço aparece na mesma tela, no formato
+   `https://SEU-USUARIO.github.io/canton-scout/`.
+5. Abra esse endereço no celular e siga o checklist "Antes de embarcar".
+
+Se o push pedir senha: o GitHub não aceita mais senha de conta. Gere um token
+em **Settings → Developer settings → Personal access tokens → Tokens
+(classic)**, marque o escopo `repo`, e use o token no lugar da senha.

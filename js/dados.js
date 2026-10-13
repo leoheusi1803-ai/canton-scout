@@ -406,7 +406,12 @@ const BASE = (() => {
         out.push(Object.assign({}, m, { via: 'ncm' }));
         continue;
       }
-      // 2) casamento por nome: sinal fraco, serve de alerta
+      // Se a medida já tem NCM mapeada e o código não bateu, ela não se aplica:
+      // deixar o nome opinar aqui só gera ruído — "Luvas" casava com artigos de
+      // cozinha porque o texto da NCM 7323 cita "luvas (…) para limpeza".
+      if (m.ncms) continue;
+
+      // 2) casamento por nome: só para as medidas ainda sem NCM mapeada
       if (!m.toks.length) continue;
       let bate = 0;
       for (const t of m.toks) {
@@ -416,7 +421,11 @@ const BASE = (() => {
           if (a.length >= 5 && t.length >= 5 && (a.startsWith(t.slice(0, 5)) || t.startsWith(a.slice(0, 5)))) { bate++; break; }
         }
       }
-      const exige = Math.min(2, m.toks.length);
+      // Exigir maioria dos termos, não dois quaisquer. Sem isso, "artigos de
+      // cozinha de ferro ou aço" casava com "laminados planos de aço ao
+      // silício" só por dividir a palavra "aço" — e um alarme falso desses
+      // faz descartar uma categoria boa.
+      const exige = m.toks.length === 1 ? 1 : Math.max(2, Math.ceil(m.toks.length * 0.6));
       if (bate >= exige) out.push(Object.assign({}, m, { via: 'nome' }));
     }
     return out;
@@ -501,6 +510,7 @@ const BASE = (() => {
   return {
     carregar, buscar, risco, medidasAD, regrasTA, regrasLPCO,
     item: (ncm) => porNcm.get(ncm) || null,
+    itensPorPrefixo: (p) => itens.filter(it => it.ncm.startsWith(p)),
     capitulo: (c) => capitulos[c] || '',
     orgaoNome: (sigla) => (anuencia && anuencia.orgaos && anuencia.orgaos[sigla]) || sigla,
     totalItens: () => itens.length,

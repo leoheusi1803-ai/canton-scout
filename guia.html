@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Guia de risco — Fases 2 e 3</title>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+<style>
+  body{padding-bottom:28px}
+  .wrap{padding:14px;max-width:760px;margin:0 auto}
+  .cab{margin-bottom:16px}
+  .cab h1{font-size:22px;margin:0 0 6px}
+  .cab p{color:var(--dim);font-size:13px;margin:0 0 4px;line-height:1.55}
+  .fase{margin:22px 0 10px;padding:11px 13px;border-radius:12px;font-weight:700;font-size:15px;
+    background:linear-gradient(135deg,#1e3a8a,#4c1d95);border:1px solid #2b4ba8}
+  .fase small{color:#bfdbfe;font-weight:400}
+  .cat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px;margin-bottom:10px}
+  .cat.bad{border-left:4px solid var(--bad)}
+  .cat.mid{border-left:4px solid var(--mid)}
+  .cat.warn{border-left:4px solid var(--warn)}
+  .cat.ok{border-left:4px solid var(--ok)}
+  .cat-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:7px}
+  .cat-n{font-weight:650;font-size:15.5px}
+  .cat-p{font-size:11px;color:var(--dim2);font-family:ui-monospace,Menlo,monospace;margin-top:2px}
+  .cat-t{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .ad{background:#43161a;border:1px solid #7a2a2a;border-radius:9px;padding:9px 11px;margin-top:9px;font-size:12.5px}
+  .ad b{color:#fca5a5}
+  .lg{display:grid;gap:7px;margin:14px 0 6px}
+  .lg div{font-size:12px;color:var(--dim);display:flex;gap:8px;align-items:center}
+  .voltar{display:inline-block;margin-bottom:14px;color:var(--ac);text-decoration:none;font-size:13.5px}
+  @media print{
+    body{background:#fff;color:#000}
+    .cat,.fase{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="voltar" href="./">&larr; voltar ao app</a>
+  <div class="cab">
+    <h1>Guia de risco — Canton Fair, Fases 2 e 3</h1>
+    <p>Gerado a partir das mesmas bases oficiais que o app usa: TEC/TIPI, tratamento
+    administrativo do Siscomex e medidas antidumping do DECOM. Funciona offline.</p>
+    <p><b>Leia como triagem</b>, não como parecer: a NCM exata do seu produto pode cair
+    numa subposição com regra diferente. Confirme cada caso na aba NCM.</p>
+    <div class="lg">
+      <div><span class="tag tag-bad">vermelho</span> antidumping vigente ou operação impedida</div>
+      <div><span class="tag tag-mid">laranja</span> exige licença prévia não-automática</div>
+      <div><span class="tag tag-warn">amarelo</span> licença automática, LPCO ou regra condicional</div>
+      <div><span class="tag tag-ok">verde</span> nenhuma barreira localizada na base</div>
+    </div>
+  </div>
+  <div id="saida"><p class="hint">carregando base…</p></div>
+</div>
+
+<script src="js/dados.js"></script>
+<script>
+/* Categorias que realmente aparecem nos pavilhões das Fases 2 e 3,
+   descritas por prefixo NCM. O risco de cada uma é calculado na hora,
+   em cima dos dados — não é texto escrito à mão.                      */
+const CATS = [
+  ['Fase 2 — casa, decoração, presentes, móveis e iluminação (23 a 27/10)', [
+    ['Louça e cerâmica de mesa',            ['6911', '6912']],
+    ['Vidro de mesa e decoração',           ['7013']],
+    ['Espelhos',                            ['7009']],
+    ['Artigos de cozinha de plástico',      ['3924']],
+    ['Artigos de cozinha de ferro ou aço',  ['7323']],
+    ['Artigos de cozinha de alumínio',      ['7615']],
+    ['Talheres e cutelaria',                ['8211', '8215']],
+    ['Móveis e assentos',                   ['9401', '9403']],
+    ['Colchões, almofadas e edredons',      ['9404']],
+    ['Luminárias e iluminação',             ['9405']],
+    ['Lâmpadas LED',                        ['8539']],
+    ['Velas',                               ['3406']],
+    ['Molduras e quadros',                  ['4414', '830630']],
+    ['Estatuetas e objetos de ornamento',   ['830629', '691310', '691390']],
+    ['Relógios de parede e despertadores',  ['9105']],
+    ['Tapetes e revestimentos de piso',     ['5701', '5702', '5703', '5705']],
+    ['Cortinas e roupa de cama',            ['6302', '6303']],
+    ['Artigos de decoração de madeira',     ['4420']],
+    ['Cestaria, bambu e vime',              ['4602']],
+    ['Cadeados e fechaduras',               ['8301']],
+    ['Ferragens e puxadores',               ['8302']],
+    ['Brinquedos',                          ['9503']],
+    ['Artigos de festa e de Natal',         ['9505']],
+    ['Eletrodomésticos de cozinha',         ['8509', '8516']],
+    ['Ventiladores',                        ['841451']],
+    ['Alto-falantes e caixas de som',       ['8518']],
+    ['Garrafas térmicas',                   ['9617']]
+  ]],
+  ['Fase 3 — têxtil, confecção, calçados, escritório, saúde e alimentos (31/10 a 04/11)', [
+    ['Calçados',                            ['6401', '6402', '6403', '6404', '6405']],
+    ['Vestuário de malha',                  ['6103', '6104', '6105', '6106', '6109', '6110']],
+    ['Vestuário exceto de malha',           ['6203', '6204', '6205', '6206']],
+    ['Malhas e tecidos sintéticos',         ['6004', '6006']],
+    ['Meias',                               ['6115']],
+    ['Roupa de banho e toucador',           ['6302']],
+    ['Bolsas, mochilas e malas',            ['4202']],
+    ['Chapéus e bonés',                     ['6505']],
+    ['Bijuteria',                           ['7117']],
+    ['Óculos de sol e armações',            ['9003', '9004']],
+    ['Guarda-chuvas',                       ['6601']],
+    ['Canetas esferográficas',              ['9608']],
+    ['Lápis',                               ['9609']],
+    ['Cadernos e papelaria',                ['4820']],
+    ['Escovas de dente, cabelo e pincéis',  ['9603']],
+    ['Cosméticos e maquiagem',              ['3303', '3304', '3305', '3307']],
+    ['Sabonetes e sabões',                  ['3401']],
+    ['Fraldas e absorventes',               ['9619']],
+    ['Luvas de borracha',                   ['4015']],
+    ['Seringas, agulhas e material médico', ['9018']],
+    ['Termômetros',                         ['9025']],
+    ['Cadeiras de rodas e andadores',       ['8713', '8714']],
+    ['Massas, biscoitos e preparações',     ['1902', '1905']],
+    ['Suplementos e preparações alimentares', ['2106']],
+    ['Chocolate e confeitaria',             ['1704', '1806']],
+    ['Chá e café',                          ['0902', '0901']]
+  ]]
+];
+
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const ORDEM = { ok: 0, warn: 1, mid: 2, bad: 3 };
+
+function analisar(prefixos) {
+  // junta tudo que existe sob os prefixos da categoria, sem repetir código
+  const alvos = [];
+  const vistos = new Set();
+  prefixos.forEach(p => {
+    BASE.itensPorPrefixo(p).forEach(it => {
+      if (!vistos.has(it.ncm)) { vistos.add(it.ncm); alvos.push(it); }
+    });
+  });
+  if (!alvos.length) return null;
+
+  const iis = alvos.map(i => typeof i.ii === 'number' ? i.ii : null).filter(v => v !== null);
+  const ipis = alvos.map(i => typeof i.ipi === 'number' ? i.ipi : null).filter(v => v !== null);
+  const orgaos = new Set();
+  const ads = new Map();
+  let pior = 'ok';
+  alvos.forEach(it => {
+    const r = BASE.risco(it.ncm, { cond: 'novo', texto: '' });
+    r.orgaos.forEach(o => orgaos.add(o));
+    r.antidumping.forEach(m => { if (!ads.has(m.prod)) ads.set(m.prod, m); });
+    if (ORDEM[r.nivel] > ORDEM[pior]) pior = r.nivel;
+  });
+  const faixa = (a) => !a.length ? '—'
+    : (Math.min(...a) === Math.max(...a) ? Math.min(...a) + '%' : Math.min(...a) + '% a ' + Math.max(...a) + '%');
+  return {
+    n: alvos.length, nivel: pior,
+    ii: faixa(iis), ipi: faixa(ipis),
+    orgaos: Array.from(orgaos).sort(),
+    ads: Array.from(ads.values())
+  };
+}
+
+function render() {
+  let h = '';
+  CATS.forEach(([titulo, cats]) => {
+    const [t1, t2] = titulo.split(' (');
+    h += `<div class="fase">${esc(t1)}<br><small>${esc('(' + t2)}</small></div>`;
+    const linhas = cats.map(([nome, pref]) => ({ nome, pref, a: analisar(pref) }))
+      .filter(x => x.a)
+      .sort((x, y) => ORDEM[y.a.nivel] - ORDEM[x.a.nivel] || x.nome.localeCompare(y.nome));
+    linhas.forEach(({ nome, pref, a }) => {
+      h += `<div class="cat ${a.nivel}">
+        <div class="cat-h">
+          <div><div class="cat-n">${esc(nome)}</div>
+            <div class="cat-p">NCM ${pref.join(' · ')} — ${a.n} código(s)</div></div>
+          <div style="text-align:right;white-space:nowrap">
+            <div style="font-size:12.5px"><b>II</b> ${esc(a.ii)}</div>
+            <div style="font-size:12.5px;color:var(--dim)"><b>IPI</b> ${esc(a.ipi)}</div>
+          </div>
+        </div>
+        <div class="cat-t">
+          ${a.orgaos.length
+            ? a.orgaos.map(o => `<span class="tag tag-ac" title="${esc(BASE.orgaoNome(o))}">${esc(o)}</span>`).join('')
+            : '<span class="tag tag-ok">sem órgão anuente</span>'}
+        </div>
+        ${(() => {
+          const porNcm = a.ads.filter(m => m.via === 'ncm');
+          const porNome = a.ads.filter(m => m.via !== 'ncm');
+          let s = '';
+          if (porNcm.length) s += `<div class="ad"><b>Antidumping contra a China:</b><br>` +
+            porNcm.map(m => `• ${esc(m.prod)} — vigente até ${esc(m.prazo)}` +
+              (m.susp ? ' <i>(cobrança suspensa)</i>' : '')).join('<br>') + `</div>`;
+          if (porNome.length) s += `<div class="ad" style="background:#3f2a10;border-color:#7a5a1a">
+            <b style="color:#fbbf24">Pode haver antidumping — confirmar:</b><br>` +
+            porNome.map(m => `• ${esc(m.prod)} — até ${esc(m.prazo)}`).join('<br>') +
+            `<br><i style="color:var(--dim2)">casou só por semelhança de nome, não pela NCM</i></div>`;
+          return s;
+        })()}
+      </div>`;
+    });
+  });
+  document.getElementById('saida').innerHTML = h;
+}
+
+BASE.carregar(() => {}).then(render).catch(e => {
+  document.getElementById('saida').innerHTML =
+    '<p class="warn">Falha ao carregar a base: ' + esc(e.message) + '</p>';
+});
+</script>
+</body>
+</html>

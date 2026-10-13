@@ -1,6 +1,7 @@
 # Servidor local estatico (sem Node). Uso: .\build\serve.ps1 [porta]
-param([int]$Porta = 8099)
-$RAIZ = "C:\Users\Leonardo Heusi\canton-scout"
+# -Raiz serve outra pasta: util p/ testar o app em subpasta, como o GitHub Pages faz
+param([int]$Porta = 8099, [string]$Raiz = "C:\Users\Leonardo Heusi\canton-scout")
+$RAIZ = $Raiz
 
 $MIME = @{
   '.html' = 'text/html; charset=utf-8'
@@ -33,6 +34,8 @@ while ($l.IsListening) {
     if (-not $full.StartsWith([System.IO.Path]::GetFullPath($RAIZ), 'OrdinalIgnoreCase')) {
       $ctx.Response.StatusCode = 403; $ctx.Response.Close(); continue
     }
+    # pasta -> index.html, como fazem GitHub Pages / Netlify
+    if (Test-Path $full -PathType Container) { $full = Join-Path $full 'index.html' }
     if (Test-Path $full -PathType Leaf) {
       $ext = [System.IO.Path]::GetExtension($full).ToLower()
       $ct = $MIME[$ext]; if (-not $ct) { $ct = 'application/octet-stream' }
