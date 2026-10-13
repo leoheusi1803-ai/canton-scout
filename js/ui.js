@@ -489,7 +489,10 @@
         <h3>Resultado</h3>
         <table class="br">
           <tr><td>Desembolso total</td><td>${brl(c.total)}</td></tr>
-          ${c.creditoLinhas.map(x => `<tr class="sub"><td>− ${esc(x.rotulo)}</td><td>−${brl(x.valor)}</td></tr>`).join('')}
+          ${c.creditoLinhas.map(x => `<tr class="sub"><td>− ${esc(x.rotulo)}${x.ref ? `<span class="ref">${esc(x.ref)}</span>` : ''}</td><td>−${brl(x.valor)}</td></tr>`).join('')}
+          ${c.icmsAcumulado > 0.01 ? `<tr class="sub"><td>ICMS que fica acumulado
+            <span class="ref">crédito sem débito de saída para absorver</span></td>
+            <td>${brl(c.icmsAcumulado)}</td></tr>` : ''}
           <tr class="sum"><td>Custo efetivo</td><td>${brl(c.liquido)}</td></tr>
           <tr><td>Custo efetivo por peça</td><td>${brl(c.unitLiquido)}</td></tr>
           <tr><td>Preço de venda p/ ${cfg.margemAlvo}% de margem<span class="ref">margem sobre o preço de venda</span></td><td>${brl(vendaNec)}</td></tr>
@@ -504,8 +507,17 @@
   const MAP_CFG = {
     'k-usd': 'usdBrl', 'k-cny': 'cnyBrl', 'k-icms': 'icmsPct', 'k-regime': 'regime',
     'k-data': 'dataRef', 'k-modal': 'modal', 'k-frete': 'freteUsd', 'k-seguro': 'seguroPct',
-    'k-desp': 'despesasBrl', 'k-siscomex': 'siscomexBrl'
+    'k-desp': 'despesasBrl', 'k-siscomex': 'siscomexBrl', 'k-saida': 'aliqSaidaPct'
   };
+
+  function avisoSaida() {
+    const inter = Number(cfg.aliqSaidaPct) < Number(cfg.icmsPct);
+    $('#saida-aviso').textContent = inter
+      ? `Atenção: você paga ${cfg.icmsPct}% de ICMS no desembaraço e debita só `
+        + `${cfg.aliqSaidaPct}% na saída. A diferença vira crédito acumulado, que demora a `
+        + `virar dinheiro. O app passa a abater só a parte do crédito que a venda absorve.`
+      : `Saída a ${cfg.aliqSaidaPct}%: o crédito de ICMS da importação tende a ser absorvido pela venda.`;
+  }
 
   function pintarConfig() {
     const uf = $('#k-uf');
@@ -515,6 +527,7 @@
     Object.entries(MAP_CFG).forEach(([id, k]) => { const e = $('#' + id); if (e) e.value = cfg[k]; });
     $('#k-capatazia').checked = !!cfg.capatazia;
     avisoIcms();
+    avisoSaida();
     $('#k-fontes').innerHTML = (() => {
       const m = BASE.meta();
       return `<div><b>NCM / TEC — Imposto de Importação</b><br>${esc(m.fiscal.tec_ato)}</div>
@@ -535,8 +548,9 @@
       const e = $('#' + id); if (!e) return;
       e.oninput = e.onchange = () => {
         const num = e.type === 'number';
-        cfg[k] = num ? (parseFloat(e.value) || 0) : e.value;
+        cfg[k] = (num || k === 'aliqSaidaPct') ? (parseFloat(e.value) || 0) : e.value;
         DB.setCfg(k, cfg[k]);
+        if (k === 'aliqSaidaPct') avisoSaida();
       };
     });
     $('#k-uf').onchange = () => {
@@ -544,7 +558,7 @@
       cfg.icmsPct = UF_ICMS[cfg.uf];
       $('#k-icms').value = cfg.icmsPct;
       DB.setCfg('uf', cfg.uf); DB.setCfg('icmsPct', cfg.icmsPct);
-      avisoIcms();
+      avisoIcms(); avisoSaida();
     };
     $('#k-capatazia').onchange = () => { cfg.capatazia = $('#k-capatazia').checked; DB.setCfg('capatazia', cfg.capatazia); };
     $('#btn-teste').onclick = testarOffline;

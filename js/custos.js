@@ -120,18 +120,41 @@ const CUSTOS = (() => {
     const tributos = II + IPI + PIS + COFINS + CBS + IBS + ICMS;
     const total = VA + tributos + afrmm + siscomex + despesas;
 
-    /* ---------- 9. créditos recuperáveis ---------- */
+    /* ---------- 9. créditos recuperáveis ----------
+       Crédito de ICMS só vira dinheiro na medida em que exista débito na
+       saída para absorvê-lo. Quem desembaraça em SC sem benefício paga 17%
+       na entrada; revendendo para outro estado, a saída de mercadoria
+       importada é 4% (Res. Senado 13/2012) e a diferença fica acumulada.
+       Então o crédito aproveitado é limitado pelo débito estimado da venda. */
     const aproveita = cfg.regime === 'real';
     let cred = 0;
     const credL = [];
+    let icmsAproveitado = 0, icmsAcumulado = 0, debitoSaida = 0, vendaEstim = 0;
+
     if (aproveita) {
       if (cfg.creditaIpi && !ipiNT) { cred += IPI; credL.push({ rotulo: 'Crédito de IPI', valor: IPI }); }
       cred += PIS; if (PIS) credL.push({ rotulo: 'Crédito de PIS', valor: PIS });
       cred += COFINS; if (COFINS) credL.push({ rotulo: 'Crédito de COFINS', valor: COFINS });
-      cred += ICMS; if (ICMS) credL.push({ rotulo: 'Crédito de ICMS', valor: ICMS });
       if (cbsCompensa) {
         cred += CBS + IBS;
         credL.push({ rotulo: 'CBS/IBS 2026 compensados', valor: CBS + IBS });
+      }
+      if (ICMS > 0) {
+        // 1ª passada: custo supondo crédito integral, só para estimar o preço de venda
+        const unitOtimista = (total - cred - ICMS) / qtd;
+        const m = num(cfg.margemAlvo) / 100;
+        vendaEstim = (m < 1 ? unitOtimista / (1 - m) : unitOtimista) * qtd;
+        debitoSaida = vendaEstim * num(cfg.aliqSaidaPct) / 100;
+        icmsAproveitado = Math.min(ICMS, debitoSaida);
+        icmsAcumulado = ICMS - icmsAproveitado;
+        cred += icmsAproveitado;
+        credL.push({
+          rotulo: 'Crédito de ICMS aproveitado',
+          valor: icmsAproveitado,
+          ref: icmsAcumulado > 0.01
+            ? `limitado pelo débito de saída a ${num(cfg.aliqSaidaPct)}%`
+            : 'crédito absorvido integralmente'
+        });
       }
     }
     const liquido = total - cred;
@@ -141,6 +164,7 @@ const CUSTOS = (() => {
       linhas: L,
       VA, II, IPI, PIS, COFINS, CBS, IBS, ICMS, afrmm, siscomex, despesas,
       tributos, total, creditos: cred, creditoLinhas: credL, liquido,
+      icmsAproveitado, icmsAcumulado, debitoSaida, vendaEstim,
       unit: total / qtd,
       unitLiquido: liquido / qtd,
       /* múltiplo sobre o FOB: quantas vezes o preço de fábrica */
@@ -160,6 +184,8 @@ const CUSTOS = (() => {
   const CFG_PADRAO = {
     usdBrl: 5.40, cnyBrl: 0.76,
     uf: 'SC', icmsPct: 17, regime: 'real', creditaIpi: true,
+    // 17% = revenda dentro de SC; 4% = interestadual de mercadoria importada
+    aliqSaidaPct: 17,
     dataRef: '2026', compensarCbs: true, cbsPct: 8.80,
     capatazia: false, capataziaBrl: 0,
     modal: 'lcl', freteModo: 'tarifa', tarifaFrete: 95, freteUsd: 0,

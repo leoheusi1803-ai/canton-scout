@@ -99,9 +99,13 @@ recarregamento no celular** (o service worker guarda a versão antiga).
   (`AD_NCM`, em `js/dados.js`) para 36 das 60 medidas que envolvem a China —
   é triagem, não escopo legal. O escopo real está na Resolução Gecex de cada
   medida. Quando a medida bate só por semelhança de nome, o app avisa.
-- **ICMS é estimativa.** A tabela por UF é o ponto de partida; vários estados
-  mexeram na alíquota em 2025/2026 e existem regimes especiais de importação
-  (SC, ES, GO, MG…) que mudam muito a conta. Confirme a sua.
+- **ICMS: SC, 17%, sem benefício** — confirmado como alíquota interna de SC em
+  2026. Se vocês optarem por TTD 409/410/411 no futuro, a carga cai muito e a
+  conta muda: me avisem para reconfigurar.
+- **Crédito de ICMS nem sempre vira dinheiro.** Revenda interestadual de
+  mercadoria importada sai a 4% (Res. Senado 13/2012), contra 17% pagos no
+  desembaraço. O app estima o débito da venda e abate só a parte do crédito que
+  ela absorve; o resto aparece como "ICMS que fica acumulado".
 - **CBS/IBS estão em transição.** 2026 é ano-teste (0,9% + 0,1%, compensáveis
   contra PIS/COFINS). A base de cálculo na importação ainda está sendo
   regulamentada — o app usa VA + II + IPI como aproximação e avisa disso.
