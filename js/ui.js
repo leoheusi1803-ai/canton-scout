@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v10 · 14/10/2026 · salvar pela foto';
+  const VERSAO = 'v11 · 14/10/2026 · custo por peça correto';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -790,6 +790,8 @@
       </div>
       <p class="hint" style="margin:0 0 10px">Caixa de caneca ≈ 0,002 · caixa de sapato ≈ 0,008 ·
       luminária média ≈ 0,02. Ajuste no olho; erro aqui mexe pouco no total.</p>
+      <label class="chk" style="margin:0 0 12px"><input type="checkbox" id="qc-fixas"${cfg.rapidaFixas ? ' checked' : ''}>
+        Ratear despesas do embarque neste produto</label>
       <div id="qc-saida"></div>
     </div>`;
 
@@ -840,35 +842,59 @@
         saida.innerHTML = '<p class="hint" style="margin:0">Preencha preço e quantidade.</p>';
         return;
       }
-      const c = CUSTOS.calcular(p, cfg);
+      /* Despachante, THC, armazenagem e Siscomex são custos do EMBARQUE,
+         não do produto: o mesmo contêiner leva vários produtos e paga uma
+         vez só. Jogar tudo em cima de um item é errado em qualquer
+         quantidade, e com quantidade baixa produz número absurdo com cara
+         de verdade. Aqui ficam de fora por padrão; quem quer a conta cheia
+         do lote usa a aba Custos.                                          */
+      const incluirFixas = $('#qc-fixas') ? $('#qc-fixas').checked : false;
+      cfg.rapidaFixas = incluirFixas;
+      DB.setCfg('rapidaFixas', incluirFixas);
+      const cfgQC = incluirFixas ? cfg
+        : Object.assign({}, cfg, { despesasBrl: 0, siscomexBrl: 0 });
+      const c = CUSTOS.calcular(p, cfgQC);
+
       const ref = PRECOS ? PRECOS[guia.prod ? guia.prod.n : ''] : null;
       let refHtml = '';
       if (ref) {
-        const margemMin = ref.min > 0 ? (1 - c.unitLiquido / ref.min) * 100 : 0;
-        const margemMax = ref.max > 0 ? (1 - c.unitLiquido / ref.max) * 100 : 0;
-        const bom = margemMax >= 35;
-        refHtml = `<div class="alerta ${bom ? 'ok' : 'warn'}" style="margin:12px 0 0">
-          <b>Venda no Brasil: ${brl(ref.min)} a ${brl(ref.max)}</b>
-          Com custo efetivo de ${brl(c.unitLiquido)}, a margem fica entre
-          <b>${margemMin.toFixed(0)}%</b> e <b>${margemMax.toFixed(0)}%</b> sobre o preço de venda.
-          <span class="ref" style="display:block;margin-top:6px">${esc(ref.nota)}</span></div>`;
+        if (c.unitLiquido >= ref.max) {
+          refHtml = `<div class="alerta bad" style="margin:12px 0 0">
+            <b>Não fecha</b>Esse produto se vende no Brasil entre ${brl(ref.min)} e ${brl(ref.max)},
+            e o seu custo efetivo é ${brl(c.unitLiquido)} — acima do teto do mercado.
+            ${pesoFixas > 0.25 ? 'Confira a quantidade antes de descartar: ela pode estar distorcendo a conta.' : 'Nessa condição não há margem.'}
+            <span class="ref" style="display:block;margin-top:6px">${esc(ref.nota)}</span></div>`;
+        } else {
+          const margemMin = ref.min > 0 ? (1 - c.unitLiquido / ref.min) * 100 : 0;
+          const margemMax = ref.max > 0 ? (1 - c.unitLiquido / ref.max) * 100 : 0;
+          const bom = margemMax >= 35;
+          refHtml = `<div class="alerta ${bom ? 'ok' : 'warn'}" style="margin:12px 0 0">
+            <b>Venda no Brasil: ${brl(ref.min)} a ${brl(ref.max)}</b>
+            Com custo efetivo de ${brl(c.unitLiquido)}, a margem fica entre
+            <b>${margemMin < 0 ? '0' : margemMin.toFixed(0)}%</b> e <b>${margemMax.toFixed(0)}%</b> sobre o preço de venda.
+            ${margemMin < 0 ? '<br>No piso da faixa você vende no prejuízo.' : ''}
+            <span class="ref" style="display:block;margin-top:6px">${esc(ref.nota)}</span></div>`;
+        }
       }
       saida.innerHTML = `
         <div class="kpi" style="margin-bottom:0">
           <div><div class="k-l">Custo por peça</div><div class="k-v hi">${brl(c.unit)}</div>
-            <div class="k-s">nacionalizado, tudo incluso</div></div>
+            <div class="k-s">${incluirFixas ? 'com despesas do embarque' : 'produto + frete + impostos'}</div></div>
           <div><div class="k-l">Efetivo por peça</div><div class="k-v">${brl(c.unitLiquido)}</div>
             <div class="k-s">${c.aproveita ? 'descontando créditos' : 'Simples: sem crédito'}</div></div>
           <div><div class="k-l">Multiplicador</div><div class="k-v">${c.multiplo.toFixed(2)}×</div>
             <div class="k-s">sobre o preço do estande</div></div>
           <div><div class="k-l">Total do lote</div><div class="k-v" style="font-size:17px">${brl(c.total)}</div>
-            <div class="k-s">${c.qtd.toLocaleString('pt-BR')} peças</div></div>
+            <div class="k-s">${c.qtd.toLocaleString('pt-BR')} peça${c.qtd > 1 ? 's' : ''}</div></div>
         </div>
         ${refHtml}
-        <p class="hint">Inclui II, IPI, PIS, COFINS, ICMS, AFRMM, Siscomex, frete e despesas da Config.
+        <p class="hint">Inclui II, IPI, PIS, COFINS, ICMS, AFRMM e o frete internacional.
+        ${incluirFixas
+          ? `Inclui também ${brl(cfg.despesasBrl + cfg.siscomexBrl)} de despesas do embarque, rateadas por ${c.qtd.toLocaleString('pt-BR')} peça${c.qtd > 1 ? 's' : ''}.`
+          : 'Não inclui despachante, THC, armazenagem nem Siscomex — essas são do embarque inteiro, que leva vários produtos, e não deste item sozinho.'}
         Antidumping, quando existe, entra por fora.</p>`;
     };
-    ['qc-preco', 'qc-moeda', 'qc-qtd', 'qc-cbm'].forEach(id => {
+    ['qc-preco', 'qc-moeda', 'qc-qtd', 'qc-cbm', 'qc-fixas'].forEach(id => {
       const e = $('#' + id); if (e) e.oninput = e.onchange = calcRapido;
     });
     calcRapido();
