@@ -17,7 +17,8 @@
     { "id": "escr",   "nome": "Escritório e papelaria","ico": "✏️" },
     { "id": "saude",  "nome": "Saúde e beleza",        "ico": "💄" },
     { "id": "ferr",   "nome": "Ferramentas e ferragens","ico": "🔧" },
-    { "id": "alim",   "nome": "Alimentos",             "ico": "☕" }
+    { "id": "alim",   "nome": "Alimentos",             "ico": "☕" },
+    { "id": "info",   "nome": "Informática e eletrônicos", "ico": "💻" }
   ],
   "produtos": [
 
@@ -556,6 +557,54 @@
 
     { "n": "Suplemento alimentar", "cat": "alim", "alt": ["supplement", "protein", "vitamin", "suplemento", "vitamina"],
       "q": "Confirma que é preparação alimentícia / suplemento?",
-      "op": [["Sim", "210690"]] }
+      "op": [["Sim", "210690"]] },
+
+    { "n": "Notebook / laptop", "cat": "info", "alt": ["laptop", "notebook", "ultrabook", "netbook"],
+      "q": "O que é exatamente?",
+      "op": [["Notebook, laptop ou tablet", "847130"], ["Desktop / gabinete", "847150"]] },
+
+    { "n": "Monitor / televisor", "cat": "info", "alt": ["monitor", "display", "tela", "television", "tv"],
+      "q": "Para que serve?",
+      "op": [["Monitor de computador", "852852"], ["Televisor", "852872"]] },
+
+    { "n": "Teclado", "cat": "info", "alt": ["keyboard", "computer keyboard", "teclado"],
+      "q": "Confirma que é teclado de computador?",
+      "op": [["Sim", "84716052"]] },
+
+    { "n": "Mouse / apontador", "cat": "info", "alt": ["mouse", "computer mouse", "trackball"],
+      "q": "O que é?",
+      "op": [["Mouse ou track-ball", "84716053"], ["Mesa digitalizadora", "84716054"]] },
+
+    { "n": "Impressora / copiadora", "cat": "info", "alt": ["printer", "impressora", "photocopier", "copiadora"],
+      "q": "Que tipo?",
+      "op": [["Impressora", "844332"], ["Multifuncional ou copiadora", "844331"]] },
+
+    { "n": "Celular / smartphone", "cat": "info", "alt": ["mobile phone", "smartphone", "celular", "iphone"],
+      "q": "Que tipo de aparelho?",
+      "op": [["Smartphone", "85171300"], ["Outro telefone de rede celular", "851714"]] },
+
+    { "n": "Controle remoto", "cat": "info", "alt": ["remote control", "controle remoto"],
+      "q": "Confirma que é controle remoto?",
+      "op": [["Sim", "85269200"]] },
+
+    { "n": "Câmera fotográfica / filmadora", "cat": "info", "alt": ["camera", "reflex camera", "polaroid", "filmadora"],
+      "q": "Confirma que é câmera de imagem?",
+      "op": [["Sim", "852589"]] },
+
+    { "n": "Microfone", "cat": "info", "alt": ["microphone", "microfone"],
+      "q": "Confirma que é microfone?",
+      "op": [["Sim", "851810"]] },
+
+    { "n": "Projetor", "cat": "info", "alt": ["projector", "projetor", "datashow"],
+      "q": "Confirma que é projetor de imagem?",
+      "op": [["Sim", "8528"]] },
+
+    { "n": "Tripé / suporte", "cat": "info", "alt": ["tripod", "tripe", "suporte"],
+      "q": "Para que serve?",
+      "op": [["Tripé de câmera", "900691"], ["Suporte de metal em geral", "73269090"]] },
+
+    { "n": "Roteador / modem", "cat": "info", "alt": ["router", "modem", "roteador", "wifi"],
+      "q": "Confirma que é equipamento de rede?",
+      "op": [["Sim", "851762"]] }
   ]
 }
