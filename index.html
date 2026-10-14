@@ -243,6 +243,23 @@
     </div>
 
     <div class="card">
+      <h3>Sincronizar com os outros celulares</h3>
+      <div class="f">
+        <label for="k-viagem">Código da viagem</label>
+        <input id="k-viagem" type="text" placeholder="o mesmo nos três aparelhos" autocapitalize="off" autocorrect="off">
+      </div>
+      <div class="f">
+        <label for="k-disp">Quem usa este celular</label>
+        <input id="k-disp" type="text" placeholder="Leonardo, irmã, Maria…">
+      </div>
+      <button id="btn-sync" class="ghost">Sincronizar agora</button>
+      <div id="sync-estado"></div>
+      <p class="hint">Sincroniza só os dados — as fotos continuam indo por AirDrop, que
+      funciona sem internet. Se a conexão cair no meio, nada se perde: o que faltou sobe
+      na próxima vez que houver rede. Sem o código, ninguém lê os dados de vocês.</p>
+    </div>
+
+    <div class="card">
       <h3>Pronto para o offline?</h3>
       <p class="hint" style="margin-top:0">Rode este teste <b>no Brasil, antes de embarcar</b>. Se der verde,
       o app abre dentro do pavilhão sem nenhuma internet.</p>
@@ -273,6 +290,7 @@
 <script src="js/dados.js"></script>
 <script src="js/custos.js"></script>
 <script src="js/visao.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

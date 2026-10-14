@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v13 · 14/10/2026 · custos unificados + AirDrop';
+  const VERSAO = 'v14 · 14/10/2026 · sincronização';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -1336,6 +1336,10 @@
     uf.value = cfg.uf;
     Object.entries(MAP_CFG).forEach(([id, k]) => { const e = $('#' + id); if (e) e.value = cfg[k]; });
     $('#k-capatazia').checked = !!cfg.capatazia;
+    $('#k-viagem').value = cfg.viagem || '';
+    $('#k-disp').value = cfg.dispositivo || '';
+    SYNC.configurar(cfg.viagem, cfg.dispositivo);
+    pintarSync();
     avisoIcms();
     avisoSaida();
     $('#k-fontes').innerHTML = (() => {
@@ -1372,6 +1376,16 @@
       avisoIcms(); avisoSaida();
     };
     $('#k-capatazia').onchange = () => { cfg.capatazia = $('#k-capatazia').checked; DB.setCfg('capatazia', cfg.capatazia); };
+    const aplicaSync = () => {
+      cfg.viagem = $('#k-viagem').value.trim();
+      cfg.dispositivo = $('#k-disp').value.trim();
+      DB.setCfg('viagem', cfg.viagem); DB.setCfg('dispositivo', cfg.dispositivo);
+      SYNC.configurar(cfg.viagem, cfg.dispositivo);
+      pintarSync();
+    };
+    $('#k-viagem').oninput = aplicaSync;
+    $('#k-disp').oninput = aplicaSync;
+    $('#btn-sync').onclick = () => sincronizar(true);
     $('#btn-teste').onclick = testarOffline;
     $('#btn-reset').onclick = () => {
       if (!confirm('Isso apaga TODOS os produtos, fotos e configurações deste aparelho. Continuar?')) return;
@@ -1446,6 +1460,68 @@
             : 'Abra o app pelo endereço https (não por arquivo), instale na tela inicial pelo menu do navegador, recarregue uma vez e teste de novo.'}</small>
         </div>`;
     }).catch(e => { out.innerHTML = `<p class="warn">Erro no teste: ${esc(e.message)}</p>`; });
+  }
+
+  /* ---------------- sincronização ----------------
+     Oportunista: tenta quando há rede e desiste em silêncio quando não há.
+     Na mesclagem, vence a versão mais recente de cada produto — o relógio
+     do aparelho basta porque ninguém edita o mesmo item em dois celulares
+     ao mesmo tempo numa feira.                                            */
+  function aplicarRecebidos(linhas) {
+    if (!linhas.length) return Promise.resolve(0);
+    let n = 0;
+    return linhas.reduce((fila, l) => fila.then(() => {
+      const existente = produtos.find(p => p.id === l.id);
+      const quando = new Date(l.atualizado).getTime();
+      if (existente && (existente.atualizado || 0) >= quando) return;   // o meu é mais novo
+      const p = Object.assign({}, l.dados, { id: l.id, atualizado: quando, apagado: l.apagado });
+      if (l.apagado) {
+        if (!existente) return;
+        produtos = produtos.filter(x => x.id !== l.id);
+        return DB.apagarProduto(l.id).then(() => { n++; });
+      }
+      return DB.salvarProduto(p).then(() => {
+        if (existente) produtos[produtos.indexOf(existente)] = p;
+        else produtos.push(p);
+        n++;
+      });
+    }), Promise.resolve()).then(() => n);
+  }
+
+  function pintarSync() {
+    const el = $('#sync-estado');
+    if (!el) return;
+    const s = SYNC.estado();
+    if (!SYNC.ativo()) {
+      el.innerHTML = '<p class="hint" style="margin:8px 0 0">Preencha o código para ativar.</p>';
+      return;
+    }
+    if (!s) { el.innerHTML = '<p class="hint" style="margin:8px 0 0">Ainda não sincronizou nesta sessão.</p>'; return; }
+    const hora = new Date(s.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    el.innerHTML = s.ok
+      ? `<div class="alerta ok" style="margin:10px 0 0"><b>Sincronizado às ${hora}</b>
+         ${s.enviados} enviado${s.enviados !== 1 ? 's' : ''}, ${s.recebidos} recebido${s.recebidos !== 1 ? 's' : ''}.</div>`
+      : `<div class="alerta warn" style="margin:10px 0 0"><b>Não sincronizou (${hora})</b>
+         ${esc(s.motivo)}. Os produtos estão salvos no aparelho — tenta de novo quando houver rede.</div>`;
+  }
+
+  function sincronizar(manual) {
+    if (!SYNC.ativo()) { if (manual) toast('Preencha o código da viagem'); return Promise.resolve(); }
+    if (manual) toast('Sincronizando…');
+    const desde = cfg.syncCorte || 0;
+    return SYNC.sincronizar(produtos, desde, aplicarRecebidos).then(r => {
+      if (r.ok) {
+        cfg.syncCorte = r.corte;
+        DB.setCfg('syncCorte', r.corte);
+        atualizaContador();
+        renderProdutos();
+        if (manual || r.recebidos) toast(`${r.enviados} enviado(s), ${r.recebidos} recebido(s)`);
+      } else if (manual) {
+        toast('Não sincronizou: ' + r.motivo);
+      }
+      pintarSync();
+      return r;
+    });
   }
 
   /* ---------------- exportar / importar ---------------- */
@@ -1611,6 +1687,8 @@
     // rede
     rede();
     window.addEventListener('online', rede);
+    // oportunista: assim que houver rede, tenta sincronizar em segundo plano
+    window.addEventListener('online', () => setTimeout(() => sincronizar(false), 1500));
     window.addEventListener('offline', rede);
     // service worker: é o que garante abrir sem internet
     if ('serviceWorker' in navigator) {
