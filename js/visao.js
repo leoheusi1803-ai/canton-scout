@@ -13,12 +13,14 @@ const VISAO = (() => {
   let carregando = null;
 
   const TAM = 224;              // entrada do MobileNet V2
-  /* Nos testes, todo acerto veio com confiança alta e todo erro veio abaixo
-     de ~12%. Sugerir com pouca confiança é pior que não sugerir: a pessoa
-     no estande toca no primeiro item e leva uma NCM errada. Então o topo
-     precisa de 20%; abaixo disso o app assume que não sabe.              */
-  const MIN_TOPO = 0.20;        // confiança mínima da 1ª sugestão
-  const MIN_ALT = 0.06;         // alternativas só aparecem se o topo passou
+  /* Limiar calibrado medindo, não no olho. Na última bateria, TODO erro
+     ficou entre 26% e 37% e TODO acerto de 46% para cima — separação limpa.
+     Acima do corte o app afirma; abaixo ele mostra como "não tenho certeza",
+     então nada se perde: só deixa de ser apresentado como se fosse certeza.
+     Errar com confiança é o pior resultado: a pessoa no estande toca no
+     primeiro item e leva uma NCM errada sem desconfiar.                   */
+  const MIN_TOPO = 0.42;        // daqui para cima o app afirma
+  const MIN_ALT = 0.06;         // piso para aparecer como palpite fraco
 
   function injetarTf() {
     if (window.tf) return Promise.resolve();
@@ -60,8 +62,21 @@ const VISAO = (() => {
 
   function prontoParaUso() { return !!modelo; }
 
-  /* Converte o arquivo numa imagem já no tamanho da rede */
+  /* Decodifica o arquivo JÁ com a orientação EXIF aplicada.
+     Foto de celular quase sempre vem com a flag de orientação, e nem todo
+     navegador aplica ao desenhar no canvas. Sem isto, a caneca chega deitada
+     e o modelo responde "spotlight" com 65% de confiança — errado e confiante,
+     que é o pior resultado possível. createImageBitmap resolve na origem. */
   function paraImagem(blob) {
+    if (self.createImageBitmap) {
+      return createImageBitmap(blob, { imageOrientation: 'from-image' })
+        .catch(() => createImageBitmap(blob))
+        .catch(() => porTagImg(blob));
+    }
+    return porTagImg(blob);
+  }
+
+  function porTagImg(blob) {
     return new Promise((ok, erro) => {
       const img = new Image();
       const url = URL.createObjectURL(blob);
@@ -81,64 +96,110 @@ const VISAO = (() => {
     return c;
   }
 
+  /* enquadra a imagem inteira num quadrado, sem cortar nada.
+     O recorte central sozinho perde o produto quando ele está
+     encostado na borda do enquadramento — comum em foto de estande. */
+  function enquadrarInteira(img) {
+    const c = document.createElement('canvas');
+    c.width = TAM; c.height = TAM;
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, TAM, TAM);
+    const r = Math.min(TAM / img.width, TAM / img.height);
+    const w = img.width * r, h = img.height * r;
+    g.drawImage(img, (TAM - w) / 2, (TAM - h) / 2, w, h);
+    return c;
+  }
+
+
+  /* uma passada do modelo: devolve o vetor de probabilidades */
+  function inferir(canvas) {
+    const cru = tf.tidy(() => {
+      const t = tf.browser.fromPixels(canvas).toFloat()
+        .div(127.5).sub(1).expandDims(0);
+      let saida = modelo.predict(t);
+      if (Array.isArray(saida)) saida = saida[0];
+      return saida.squeeze().dataSync();
+    });
+    // MobileNet V2 do TF-slim devolve LOGITS, não probabilidade
+    const menor = Math.min.apply(null, cru);
+    let soma = 0; for (let i = 0; i < cru.length; i++) soma += cru[i];
+    if (menor >= 0 && Math.abs(soma - 1) < 0.05) return Array.from(cru);
+    const max = Math.max.apply(null, cru);
+    let acc = 0;
+    const exp = new Array(cru.length);
+    for (let i = 0; i < cru.length; i++) { exp[i] = Math.exp(cru[i] - max); acc += exp[i]; }
+    return exp.map(v => v / acc);
+  }
+
+  function ranquear(vals) {
+    const desloc = vals.length === 1001 ? 1 : 0;   // índice 0 é "fundo"
+    return vals
+      .map((p, i) => ({ p, rot: rotulos[i - desloc] }))
+      .filter(x => x.rot)
+      .sort((a, b) => b.p - a.p);
+  }
+
+  function consolidar(ordenado) {
+    // duas classes podem apontar o mesmo item ("pot" e "wok" são a mesma panela)
+    const porProduto = new Map();
+    for (const x of ordenado.slice(0, 15)) {
+      const prod = mapa[x.rot];
+      if (!prod) continue;
+      const atual = porProduto.get(prod);
+      if (atual) { atual.p += x.p; atual.rots.push(x.rot); }
+      else porProduto.set(prod, { produto: prod, p: x.p, rots: [x.rot] });
+    }
+    return Array.from(porProduto.values()).sort((a, b) => b.p - a.p);
+  }
+
   function classificar(blob, quantos) {
     quantos = quantos || 3;
     if (!modelo) return Promise.reject(new Error('modelo ainda não carregado'));
+    const t0 = Date.now();
+
     return paraImagem(blob).then(img => {
-      const canvas = recortarQuadrado(img);
-      // MobileNet V2 do TF-slim espera float em [-1, 1] e devolve LOGITS,
-      // não probabilidade. Sem o softmax os números passavam de 100% e o
-      // limiar de confiança virava enfeite.
-      const bruto = tf.tidy(() => {
-        const t = tf.browser.fromPixels(canvas).toFloat()
-          .div(127.5).sub(1).expandDims(0);
-        let saida = modelo.predict(t);
-        if (Array.isArray(saida)) saida = saida[0];
-        return saida.squeeze().dataSync();
-      });
-      const menor = Math.min.apply(null, bruto);
-      let soma = 0; for (let i = 0; i < bruto.length; i++) soma += bruto[i];
-      const jaEhProbabilidade = menor >= 0 && Math.abs(soma - 1) < 0.05;
+      const centro = recortarQuadrado(img);
+      const inteira = enquadrarInteira(img);
 
-      let vals;
-      if (jaEhProbabilidade) {
-        vals = Array.from(bruto);
-      } else {
-        // softmax estável: desconta o máximo antes de exponenciar
-        const max = Math.max.apply(null, bruto);
-        let acc = 0;
-        const exp = new Array(bruto.length);
-        for (let i = 0; i < bruto.length; i++) { exp[i] = Math.exp(bruto[i] - max); acc += exp[i]; }
-        vals = exp.map(v => v / acc);
-      }
+      let melhor = null;
+      const tentadas = [];
 
-      // saída com 1001 posições traz "fundo" no índice 0
-      const desloc = vals.length === 1001 ? 1 : 0;
-      const ordenado = vals
-        .map((p, i) => ({ p, rot: rotulos[i - desloc] }))
-        .filter(x => x.rot)
-        .sort((a, b) => b.p - a.p);
+      const avaliar = (v) => {
+        const ordenado = ranquear(inferir(v.canvas));
+        const prods = consolidar(ordenado);
+        const topo = prods.length ? prods[0].p : 0;
+        tentadas.push({ vista: v.nome, topo: topo, viu: ordenado[0] ? ordenado[0].rot : '—' });
+        if (!melhor || topo > melhor.topo) melhor = { topo, prods, ordenado, vista: v.nome };
+      };
 
-      // consolida por produto do dicionário: duas classes podem apontar
-      // para o mesmo item ("pot" e "wok" são a mesma panela)
-      const porProduto = new Map();
-      for (const x of ordenado.slice(0, 15)) {
-        const prod = mapa[x.rot];
-        if (!prod) continue;
-        const atual = porProduto.get(prod);
-        if (atual) { atual.p += x.p; atual.rots.push(x.rot); }
-        else porProduto.set(prod, { produto: prod, p: x.p, rots: [x.rot] });
-      }
+      /* NÃO procurar a orientação girando a imagem. Testei: girar a caneca
+         faz o modelo ver "spotlight" com confiança MAIOR do que ele vê
+         "coffee mug" na foto em pé — então escolher a rotação mais confiante
+         troca o acerto por um erro. A orientação se resolve na decodificação
+         (createImageBitmap com from-image), não por tentativa e erro aqui.
+         Aqui só variam o enquadramento, que é ambiguidade real da foto. */
+      avaliar({ nome: 'centro', canvas: centro });
+      avaliar({ nome: 'inteira', canvas: inteira });
 
-      const ordenadoProd = Array.from(porProduto.values()).sort((a, b) => b.p - a.p);
-      const sugestoes = (ordenadoProd.length && ordenadoProd[0].p >= MIN_TOPO)
-        ? ordenadoProd.filter(s => s.p >= MIN_ALT).slice(0, quantos)
-        : [];
+      const prods = melhor ? melhor.prods : [];
+      const forte = prods.length && prods[0].p >= MIN_TOPO;
+      const sugestoes = forte ? prods.filter(s => s.p >= MIN_ALT).slice(0, quantos) : [];
+      // abaixo do limiar: devolve separado e rotulado, para a tela avisar
+      // que é palpite fraco em vez de simplesmente não dizer nada
+      const fracas = forte ? [] : prods.filter(s => s.p >= MIN_ALT).slice(0, quantos);
 
       return {
         sugestoes,
-        // o que o modelo viu, mesmo sem produto correspondente — ajuda a entender o erro
-        bruto: ordenado.slice(0, 3).map(x => ({ rot: x.rot, p: x.p }))
+        fracas,
+        bruto: (melhor ? melhor.ordenado : []).slice(0, 3).map(x => ({ rot: x.rot, p: x.p })),
+        diag: {
+          ms: Date.now() - t0,
+          backend: (tf.getBackend && tf.getBackend()) || '?',
+          imagem: img.width + '×' + img.height,
+          vista: melhor ? melhor.vista : '—',
+          tentadas: tentadas
+        }
       };
     });
   }

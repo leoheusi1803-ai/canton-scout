@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v5 · 13/10/2026 · com foto';
+  const VERSAO = 'v6 · 14/10/2026 · foto calibrada';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -48,22 +48,30 @@
   function comprimir(file) {
     if (!file.type.startsWith('image/')) return Promise.resolve(file);
     const LADO = 1280, Q = 0.72;
-    return new Promise((ok) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        let { width: w, height: h } = img;
-        const r = Math.min(1, LADO / Math.max(w, h));
-        w = Math.round(w * r); h = Math.round(h * r);
+
+    // Decodificar com a orientação EXIF aplicada. Sem isso a foto de celular
+    // é gravada deitada, e o reconhecimento erra um objeto óbvio.
+    const decodificar = self.createImageBitmap
+      ? createImageBitmap(file, { imageOrientation: 'from-image' })
+          .catch(() => createImageBitmap(file)).catch(() => null)
+      : Promise.resolve(null);
+
+    return decodificar.then(bmp => new Promise((ok) => {
+      const desenhar = (fonte, lw, lh) => {
+        const r = Math.min(1, LADO / Math.max(lw, lh));
+        const w = Math.round(lw * r), h = Math.round(lh * r);
         const c = document.createElement('canvas');
         c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
-        URL.revokeObjectURL(url);
+        c.getContext('2d').drawImage(fonte, 0, 0, w, h);
         c.toBlob(b => ok(b && b.size < file.size ? b : file), 'image/jpeg', Q);
       };
+      if (bmp) { desenhar(bmp, bmp.width, bmp.height); return; }
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => { URL.revokeObjectURL(url); desenhar(img, img.width, img.height); };
       img.onerror = () => { URL.revokeObjectURL(url); ok(file); };
       img.src = url;
-    });
+    }));
   }
 
   function blobUrl(id, blob) {
@@ -97,24 +105,49 @@
       el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">${esc(m)}</p></div>`;
     })
       .then(() => VISAO.classificar(blob, 3))
-      .then(({ sugestoes, bruto }) => {
-        if (!sugestoes.length) {
-          el.innerHTML = `<div class="card tight">
-            <p class="hint" style="margin:0">Não reconheci o produto nesta foto.
-            ${bruto.length ? 'O que mais pareceu: <b>' + esc(bruto[0].rot) + '</b>. ' : ''}
-            Dá no mesmo: use a aba <b>NCM</b> no modo Guiado e escolha pela categoria.</p></div>`;
-          return;
-        }
-        el.innerHTML = `<div class="card">
-          <h3 style="margin-bottom:9px">A foto parece ser</h3>
-          <div class="opcoes">` + sugestoes.map((s, i) => `
-            <button data-sug="${i}"><span>${esc(s.produto)}
+      .then(({ sugestoes, fracas, bruto, diag }) => {
+        // o diagnóstico fica sempre disponível: sem ele é impossível saber
+        // POR QUE uma foto óbvia não foi reconhecida
+        const detalhe = `<details style="margin-top:10px">
+          <summary class="hint" style="cursor:pointer">O que o modelo viu (para mandar ao Leonardo)</summary>
+          <table class="br" style="margin-top:8px">
+            ${bruto.map(b => `<tr><td>${esc(b.rot)}</td><td>${(b.p * 100).toFixed(1)}%</td></tr>`).join('')}
+            <tr class="sub"><td>imagem</td><td>${esc(diag.imagem)}</td></tr>
+            <tr class="sub"><td>melhor enquadramento</td><td>${esc(diag.vista)}</td></tr>
+            <tr class="sub"><td>processamento</td><td>${diag.ms} ms · ${esc(diag.backend)}</td></tr>
+          </table></details>`;
+
+        const lista = (arr, cls) => `<div class="opcoes">` + arr.map((s, i) => `
+            <button data-sug="${i}" data-cls="${cls}"><span>${esc(s.produto)}
               <small>${Math.round(s.p * 100)}% de confiança · ${esc(s.rots.slice(0, 2).join(', '))}</small></span>
-              <span class="seta">›</span></button>`).join('') + `</div>
-          <p class="hint">Toque no certo para já sair a NCM, o imposto e o alerta.
-          Se nenhum estiver certo, ignore — o modelo reconhece o objeto, não a marca nem o material.</p></div>`;
+              <span class="seta">›</span></button>`).join('') + `</div>`;
+
+        if (sugestoes.length) {
+          el.innerHTML = `<div class="card">
+            <h3 style="margin-bottom:9px">A foto parece ser</h3>
+            ${lista(sugestoes, 'forte')}
+            <p class="hint">Toque no certo para já sair a NCM, o imposto e o alerta.
+            Se nenhum estiver certo, ignore — o modelo reconhece o objeto, não o material.</p>
+            ${detalhe}</div>`;
+        } else {
+          /* Palpite fraco NÃO vira botão. Medido: dos palpites abaixo do
+             limiar, só 1 em 8 estava certo — como botão, ele seria quase
+             sempre um toque errado, e ainda ancoraria a pessoa numa resposta
+             ruim. Vira texto informativo, e o caminho é o modo Guiado.      */
+          const palpite = (fracas[0] || null);
+          el.innerHTML = `<div class="card">
+            <h3 style="margin-bottom:4px">Não reconheci</h3>
+            <p class="hint" style="margin:0">${palpite
+              ? 'Talvez seja <b>' + esc(palpite.produto) + '</b>, mas a certeza é baixa demais para eu afirmar. '
+              : (bruto.length ? 'O que mais pareceu foi <b>' + esc(bruto[0].rot) + '</b>, que não está no dicionário. ' : '')
+            }Use a aba <b>NCM</b> no modo Guiado — são três toques.</p>
+            ${detalhe}</div>`;
+        }
+
+        const alvos = sugestoes;
         el.querySelectorAll('[data-sug]').forEach(b => b.onclick = () => {
-          const s = sugestoes[+b.dataset.sug];
+          const s = alvos[+b.dataset.sug];
+          if (!s) return;
           if (!$('#f-nome').value.trim()) $('#f-nome').value = s.produto.split(' / ')[0];
           gIrParaProduto(s.produto);
         });
