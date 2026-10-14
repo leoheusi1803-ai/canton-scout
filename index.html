@@ -117,13 +117,16 @@
   <!-- ======================= PRODUTOS ======================= -->
   <section id="v-produtos" class="view">
     <div class="card tight">
-      <input id="p-filtro" type="search" placeholder="filtrar por nome, fornecedor, estande, NCM…">
+      <input id="p-filtro" type="search" placeholder="filtrar por nome, fornecedor, estande, NCM, nota…">
       <div class="seg wide" id="p-ord">
         <button type="button" class="on" data-v="data">Mais recentes</button>
         <button type="button" data-v="risco">Pior risco</button>
         <button type="button" data-v="custo">Menor custo</button>
       </div>
+      <div id="p-cats" class="chips"></div>
+      <div id="p-status" class="chips"></div>
     </div>
+    <div id="p-resumo"></div>
     <div id="p-lista" class="lista"></div>
     <div class="card">
       <button id="btn-export-json" class="ghost">Exportar backup (.json)</button>

@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v7 · 14/10/2026 · calculadora + preços';
+  const VERSAO = 'v8 · 14/10/2026 · categorias e notas';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -15,7 +15,24 @@
   let pendentes = [];          // mídias da captura ainda não salva
   let condAtual = 'novo';
   let ordem = 'data';
+  let ultimaFoto = null;
+  let filtroCat = '';            // categoria selecionada na aba Produtos
+  let filtroStatus = '';         // situação selecionada na aba Produtos
   const urlCache = new Map();
+
+  /* Situação de cada produto. É o que transforma a lista de capturas num
+     funil de trabalho depois da feira — que é quando o garimpo acontece. */
+  const STATUS = [
+    { id: 'novo',       nome: 'Capturado',     tag: 'tag' },
+    { id: 'interesse',  nome: 'Interessado',   tag: 'tag-ac' },
+    { id: 'negociando', nome: 'Negociando',    tag: 'tag-warn' },
+    { id: 'amostra',    nome: 'Amostra pedida', tag: 'tag-mid' },
+    { id: 'fechado',    nome: 'Vou comprar',   tag: 'tag-ok' },
+    { id: 'descartado', nome: 'Descartado',    tag: 'tag-bad' }
+  ];
+  const statusDe = (id) => STATUS.find(s => s.id === (id || 'novo')) || STATUS[0];
+  const dataCurta = (ts) => new Date(ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    + ' ' + new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   /* ---------------- utilitários de tela ---------------- */
   let toastT;
@@ -91,6 +108,7 @@
       toast(novos.length + (novos.length > 1 ? ' arquivos adicionados' : ' arquivo adicionado'));
       const foto = novos.find(m => (m.tipo || '').startsWith('image'));
       if (foto) reconhecer(foto.blob);
+      else toast('Vídeo guardado · o reconhecimento só lê foto');
     });
   }
 
@@ -99,8 +117,13 @@
      continua sendo pergunta, porque é ele que define a NCM.     */
   function reconhecer(blob) {
     const el = $('#sugestao');
+    ultimaFoto = blob;                 // permite reconhecer de novo sob demanda
     el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">
       analisando a foto no aparelho…</p></div>`;
+    // Da 2ª foto em diante a pessoa já rolou a tela para preencher preço e
+    // fornecedor, e o resultado aparecia fora da vista — parecia que o
+    // reconhecimento tinha parado de funcionar.
+    try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { }
     VISAO.carregar(m => {
       el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">${esc(m)}</p></div>`;
     })
@@ -144,6 +167,9 @@
             ${detalhe}</div>`;
         }
 
+        if (sugestoes.length) toast('Reconheci: ' + sugestoes[0].produto.split(' / ')[0]);
+        try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { }
+
         const alvos = sugestoes;
         el.querySelectorAll('[data-sug]').forEach(b => b.onclick = () => {
           const s = alvos[+b.dataset.sug];
@@ -165,14 +191,21 @@
     el.innerHTML = pendentes.map(m => {
       const u = blobUrl(m.id, m.blob);
       const video = (m.tipo || '').startsWith('video');
-      return `<div class="thumb">
+      return `<div class="thumb"${video ? '' : ` data-re="${m.id}" title="tocar para reconhecer de novo"`}>
         ${video ? `<video src="${u}" muted playsinline></video><span class="vid">▶ vídeo</span>`
-                : `<img src="${u}" alt="">`}
+                : `<img src="${u}" alt=""><span class="vid">🔍 tocar</span>`}
         <b data-rm="${m.id}">×</b></div>`;
     }).join('');
-    el.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
+    el.querySelectorAll('[data-rm]').forEach(b => b.onclick = (ev) => {
+      ev.stopPropagation();
       pendentes = pendentes.filter(x => x.id !== b.dataset.rm);
       renderThumbs();
+    });
+    // tocar na miniatura reanalisa aquela foto — saída se o reconhecimento
+    // não disparou ou se a pessoa quer tentar outra foto do mesmo produto
+    el.querySelectorAll('[data-re]').forEach(d => d.onclick = () => {
+      const m = pendentes.find(x => x.id === d.dataset.re);
+      if (m) reconhecer(m.blob);
     });
   }
 
@@ -217,16 +250,75 @@
   }
 
   /* ---------------- lista de produtos ---------------- */
+  function nomeCat(id) {
+    if (!PRODUTOS || !id) return '';
+    const c = PRODUTOS.categorias.find(x => x.id === id);
+    return c ? c.nome : '';
+  }
+  function icoCat(id) {
+    if (!PRODUTOS || !id) return '';
+    const c = PRODUTOS.categorias.find(x => x.id === id);
+    return c ? c.ico : '';
+  }
+
+  function renderFiltros() {
+    // só mostra categoria que existe entre os produtos capturados
+    const usadas = Array.from(new Set(produtos.map(p => p.cat).filter(Boolean)));
+    const elc = $('#p-cats');
+    elc.innerHTML = usadas.length
+      ? `<span class="chip${filtroCat ? '' : ' on'}" data-cat="">Todas</span>`
+        + usadas.map(id => {
+          const n = produtos.filter(p => p.cat === id).length;
+          return `<span class="chip${filtroCat === id ? ' on' : ''}" data-cat="${id}">${icoCat(id)} ${esc(nomeCat(id))} ${n}</span>`;
+        }).join('')
+      : '';
+    elc.querySelectorAll('[data-cat]').forEach(c => c.onclick = () => {
+      filtroCat = c.dataset.cat; renderProdutos();
+    });
+
+    const els = $('#p-status');
+    const usados = STATUS.filter(s => produtos.some(p => (p.status || 'novo') === s.id));
+    els.innerHTML = usados.length > 1
+      ? `<span class="chip${filtroStatus ? '' : ' on'}" data-st="">Todas situações</span>`
+        + usados.map(s => {
+          const n = produtos.filter(p => (p.status || 'novo') === s.id).length;
+          return `<span class="chip${filtroStatus === s.id ? ' on' : ''}" data-st="${s.id}">${esc(s.nome)} ${n}</span>`;
+        }).join('')
+      : '';
+    els.querySelectorAll('[data-st]').forEach(c => c.onclick = () => {
+      filtroStatus = c.dataset.st; renderProdutos();
+    });
+  }
+
   function renderProdutos() {
+    renderFiltros();
     const q = BASE.norm($('#p-filtro').value);
     let lista = produtos.slice();
+    if (filtroCat) lista = lista.filter(p => p.cat === filtroCat);
+    if (filtroStatus) lista = lista.filter(p => (p.status || 'novo') === filtroStatus);
     if (q) {
-      lista = lista.filter(p => BASE.norm([p.nome, p.desc, p.forn, p.estande, p.ncm, p.obs].join(' ')).includes(q));
+      lista = lista.filter(p => BASE.norm([p.nome, p.desc, p.forn, p.estande, p.ncm, p.obs,
+        (p.notas || []).map(n => n.txt).join(' ')].join(' ')).includes(q));
     }
     const riscoDe = (p) => p.ncm ? ({ ok: 0, warn: 1, mid: 2, bad: 3 })[BASE.risco(p.ncm, { cond: p.cond, texto: p.nome + ' ' + p.desc }).nivel] : -1;
     if (ordem === 'data') lista.sort((a, b) => b.criado - a.criado);
     if (ordem === 'risco') lista.sort((a, b) => riscoDe(b) - riscoDe(a) || b.criado - a.criado);
     if (ordem === 'custo') lista.sort((a, b) => (custoUnitDe(a) || 9e9) - (custoUnitDe(b) || 9e9));
+
+    // resumo do que está filtrado: o número que interessa no fim do dia
+    const res = $('#p-resumo');
+    if (lista.length) {
+      const comNcm = lista.filter(p => p.ncm).length;
+      const revisar = lista.filter(p => p.paraRevisar).length;
+      const risco = lista.filter(p => p.ncm && BASE.risco(p.ncm, { cond: p.cond, texto: p.nome + ' ' + p.desc }).nivel === 'bad').length;
+      res.innerHTML = `<div class="card tight" style="margin-bottom:10px">
+        <div class="it-foot" style="margin:0">
+          <span class="tag">${lista.length} produto${lista.length > 1 ? 's' : ''}</span>
+          <span class="tag ${comNcm === lista.length ? 'tag-ok' : 'tag-warn'}">${comNcm} classificado${comNcm !== 1 ? 's' : ''}</span>
+          ${risco ? `<span class="tag tag-bad">${risco} com risco sério</span>` : ''}
+          ${revisar ? `<span class="tag tag-bad">${revisar} para o Leonardo</span>` : ''}
+        </div></div>`;
+    } else res.innerHTML = '';
 
     const el = $('#p-lista');
     if (!lista.length) {
@@ -263,7 +355,11 @@
       tags.push('<span class="tag tag-warn">sem NCM — classificar</span>');
     }
     if (p.cond === 'usado') tags.push('<span class="tag tag-bad">usado</span>');
-    const sub = [p.forn, p.estande && 'estande ' + p.estande,
+    const st = statusDe(p.status);
+    if (st.id !== 'novo') tags.unshift(`<span class="tag ${st.tag}">${esc(st.nome)}</span>`);
+    const nNotas = (p.notas || []).length;
+    if (nNotas) tags.push(`<span class="tag">${nNotas} nota${nNotas > 1 ? 's' : ''}</span>`);
+    const sub = [p.cat ? icoCat(p.cat) + ' ' + nomeCat(p.cat) : '', p.forn, p.estande && 'estande ' + p.estande,
       p.preco ? `${p.moeda} ${n2(p.preco)}` : '', p.moq ? `MOQ ${p.moq}` : '']
       .filter(Boolean).join(' · ');
     return `<div class="it" data-abrir="${p.id}">
@@ -304,12 +400,58 @@
           ${linhaInfo('Condição', p.cond === 'usado' ? 'usado / recondicionado' : 'novo')}
           ${p.obs ? linhaInfo('Observações', p.obs) : ''}
         </table>
+        <div class="card" style="margin:12px 0 0">
+          <h3 style="margin-bottom:9px">Situação</h3>
+          <div class="chips" id="m-status">
+            ${STATUS.map(s => `<span class="chip${statusDe(p.status).id === s.id ? ' on' : ''}" data-st="${s.id}">${esc(s.nome)}</span>`).join('')}
+          </div>
+          <div class="f" style="margin-top:12px">
+            <label for="m-cat">Categoria</label>
+            <select id="m-cat">
+              <option value="">— sem categoria —</option>
+              ${(PRODUTOS ? PRODUTOS.categorias : []).map(c =>
+                `<option value="${c.id}"${p.cat === c.id ? ' selected' : ''}>${c.ico} ${esc(c.nome)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="card" style="margin:12px 0 0">
+          <h3 style="margin-bottom:9px">Notas</h3>
+          <div id="m-notas">${renderNotas(p)}</div>
+          <textarea id="m-nota-txt" rows="2" placeholder="o que aconteceu: preço que ele aceitou, prazo, amostra, concorrente…"></textarea>
+          <button class="ghost" id="m-add-nota" style="margin-top:8px">Adicionar nota</button>
+        </div>
+
         ${r ? blocoRisco(r) : '<p class="warn">Sem NCM atribuída. Classifique para ver barreiras e custo.</p>'}
         <div style="margin-top:14px">
           <button class="ghost" id="m-classificar">${p.ncm ? 'Trocar a NCM' : 'Classificar NCM'}</button>
           ${p.ncm ? '<button class="ghost" id="m-custo">Ver previsão de custo</button>' : ''}
           <button class="ghost danger" id="m-apagar">Apagar produto</button>
         </div>`);
+      /* ---- situação, categoria e notas ---- */
+      const salvar = () => { p.atualizado = Date.now(); return DB.salvarProduto(p); };
+      $('#modal-body').querySelectorAll('#m-status [data-st]').forEach(c => c.onclick = () => {
+        p.status = c.dataset.st;
+        $('#modal-body').querySelectorAll('#m-status [data-st]')
+          .forEach(x => x.classList.toggle('on', x.dataset.st === p.status));
+        salvar().then(() => { toast('Situação: ' + statusDe(p.status).nome); renderProdutos(); });
+      });
+      $('#m-cat').onchange = () => { p.cat = $('#m-cat').value; salvar().then(renderProdutos); };
+      $('#m-add-nota').onclick = () => {
+        const txt = $('#m-nota-txt').value.trim();
+        if (!txt) return;
+        p.notas = p.notas || [];
+        p.notas.push({ t: Date.now(), txt });
+        $('#m-nota-txt').value = '';
+        salvar().then(() => {
+          $('#m-notas').innerHTML = renderNotas(p);
+          ligarApagarNota(p);
+          toast('Nota salva');
+          renderProdutos();
+        });
+      };
+      ligarApagarNota(p);
+
       $('#m-classificar').onclick = () => {
         fecharModal();
         alvoProduto = p.id;
@@ -334,6 +476,26 @@
     });
   }
   const linhaInfo = (k, v) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`;
+
+  function renderNotas(p) {
+    const ns = (p.notas || []).slice().sort((a, b) => b.t - a.t);
+    if (!ns.length) return '<p class="hint" style="margin:0 0 10px">Nenhuma nota ainda.</p>';
+    return '<table class="br" style="margin-bottom:10px">' + ns.map(n =>
+      `<tr><td>${esc(n.txt)}<span class="ref">${dataCurta(n.t)}</span></td>
+       <td><span class="chip" data-apaganota="${n.t}" style="padding:3px 9px">×</span></td></tr>`).join('') + '</table>';
+  }
+
+  function ligarApagarNota(p) {
+    $('#modal-body').querySelectorAll('[data-apaganota]').forEach(b => b.onclick = () => {
+      p.notas = (p.notas || []).filter(n => String(n.t) !== b.dataset.apaganota);
+      p.atualizado = Date.now();
+      DB.salvarProduto(p).then(() => {
+        $('#m-notas').innerHTML = renderNotas(p);
+        ligarApagarNota(p);
+        renderProdutos();
+      });
+    });
+  }
 
   /* ---------------- bloco de risco ---------------- */
   function blocoRisco(r) {
@@ -808,6 +970,11 @@
     p.ncmDesc = r.item ? r.item.desc : '';
     p.ii = r.item ? r.item.ii : null;
     p.ipi = r.item ? r.item.ipi : null;
+    // a categoria vem de graça da classificação guiada — é o que organiza
+    // a lista depois da feira, sem ninguém ter que taguear à mão
+    if (guia.prod && guia.prod.cat && !p.cat) p.cat = guia.prod.cat;
+    if (guia.prod) p.nomeDic = guia.prod.n;   // chave da faixa de preço no Brasil
+    if (p.paraRevisar) p.paraRevisar = false;
     p.atualizado = Date.now();
     DB.salvarProduto(p).then(() => {
       alvoProduto = null; fecharModal();
@@ -1073,19 +1240,26 @@
   }
 
   function exportarCsv() {
-    const cab = ['Produto', 'NCM', 'Descrição NCM', 'II %', 'IPI %', 'Risco', 'Órgãos anuentes',
+    const cab = ['Categoria', 'Situação', 'Produto', 'NCM', 'Descrição NCM', 'II %', 'IPI %',
+      'PIS %', 'COFINS %', 'Risco', 'Órgãos anuentes',
       'Antidumping', 'Fornecedor', 'Estande', 'Fase', 'Contato', 'Moeda', 'Preço FOB', 'MOQ',
-      'Qtd', 'Peso kg', 'CBM', 'Custo/un BRL', 'Custo efetivo/un BRL', 'Multiplicador FOB', 'Observações'];
+      'Qtd', 'Peso kg', 'CBM', 'Custo/un BRL', 'Custo efetivo/un BRL', 'Multiplicador FOB',
+      'Venda Brasil min', 'Venda Brasil max', 'Observações', 'Notas'];
     const linhas = produtos.map(p => {
       const r = p.ncm ? BASE.risco(p.ncm, { cond: p.cond, texto: p.nome + ' ' + p.desc }) : null;
       const c = (p.ncm && typeof p.ii === 'number') ? CUSTOS.calcular(p, cfg) : null;
-      return [p.nome, p.ncm || '', p.ncmDesc || '',
+      const pc = p.ncm ? CUSTOS.pisCofinsDe(p.ncm) : null;
+      const ref = PRECOS && PRECOS[p.nomeDic || ''] ? PRECOS[p.nomeDic] : null;
+      return [nomeCat(p.cat), statusDe(p.status).nome, p.nome, p.ncm || '', p.ncmDesc || '',
         typeof p.ii === 'number' ? p.ii : '', p.ipi === 'NT' ? 'NT' : (typeof p.ipi === 'number' ? p.ipi : ''),
+        pc ? pc.pis : '', pc ? pc.cofins : '',
         r ? r.rotulo : 'sem NCM', r ? r.orgaos.join(' / ') : '',
         r ? r.antidumping.map(m => m.prod).join(' / ') : '',
         p.forn, p.estande, p.fase, p.contato, p.moeda, p.preco, p.moq, p.qtd, p.peso, p.cbm,
         c ? c.unit.toFixed(2) : '', c ? c.unitLiquido.toFixed(2) : '', c ? c.multiplo.toFixed(2) : '',
-        p.obs];
+        ref ? ref.min : '', ref ? ref.max : '',
+        p.obs,
+        (p.notas || []).map(n => dataCurta(n.t) + ': ' + n.txt).join(' | ')];
     });
     const cel = (v) => { const s = String(v == null ? '' : v); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const csv = '﻿' + [cab, ...linhas].map(l => l.map(cel).join(';')).join('\r\n');
