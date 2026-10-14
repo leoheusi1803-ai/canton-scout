@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "gerado": "2026-10-14",
+    "metodo": "Pesquisa de preco de varejo no Brasil (Mercado Livre, Magazine Luiza, Amazon, Leroy Merlin, Tok&Stok, Buscape e lojas especializadas), feita no Brasil antes da viagem. Vai embarcada porque na China nao da para pesquisar.",
+    "aviso": "E FAIXA DE REFERENCIA, nao cotacao. Preco de varejo varia muito por marca, qualidade, canal e regiao. Serve para a ordem de grandeza: se o custo nacionalizado encostar no piso da faixa, o negocio nao fecha. Confirme no SEU canal de venda.",
+    "cobertura": "10 produtos dos mais provaveis das Fases 2 e 3. Os demais do dicionario ainda nao tem preco pesquisado."
+  },
+  "precos": {
+    "Caneca / xícara": {
+      "min": 15, "max": 30,
+      "nota": "Varejo unitário. No atacado, caneca de porcelana personalizada sai por R$ 12 a R$ 15 a partir de 500 peças — esse é o preço que você vai ter que bater."
+    },
+    "Luminária de mesa ou de chão": {
+      "min": 50, "max": 200,
+      "nota": "Entrada aparece a partir de R$ 26 no Mercado Livre; Tok&Stok e Leroy vão de R$ 70 a R$ 460. A faixa de R$ 50 a R$ 200 é onde está o volume."
+    },
+    "Garrafa térmica / copo térmico": {
+      "min": 25, "max": 92,
+      "nota": "Inox 500 ml. Genérico a partir de R$ 25; marca consolidada e parede dupla chegam a R$ 90."
+    },
+    "Ventilador": {
+      "min": 100, "max": 200,
+      "nota": "Ventilador de mesa 30–40 cm. Mondial a R$ 99,90, Arno a R$ 199. ATENÇÃO: ventilador de mesa tem antidumping contra a China."
+    },
+    "Caixa de som / alto-falante": {
+      "min": 180, "max": 600,
+      "nota": "Bluetooth portátil. Entrada R$ 189 a R$ 280 (WAAW, JBL Go). ATENÇÃO: alto-falantes têm antidumping contra a China."
+    },
+    "Relógio de parede / despertador": {
+      "min": 30, "max": 100,
+      "nota": "Relógio de parede decorativo comum. Básico a partir de R$ 27; design elaborado passa de R$ 600."
+    },
+    "Toalha de banho / rosto": {
+      "min": 48, "max": 160,
+      "nota": "100% algodão. Döhler a partir de R$ 49, Karsten R$ 76 a R$ 85, algodão egípcio acima de R$ 150."
+    },
+    "Mochila": {
+      "min": 50, "max": 200,
+      "nota": "Mochila escolar comum. Magazine Luiza tem de R$ 69 a R$ 89; Amazon e Kalunga sobem para R$ 140 a R$ 195."
+    },
+    "Bolsa feminina": {
+      "min": 50, "max": 200,
+      "nota": "Couro sintético. Transversal a partir de R$ 45; média de R$ 79 a R$ 119. Marca de grife é outro mercado."
+    },
+    "Tênis esportivo": {
+      "min": 450, "max": 900,
+      "nota": "CUIDADO: esta faixa é de MARCA CONSOLIDADA (Nike, Adidas, Asics). Tênis sem marca no varejo popular vende bem abaixo disso, e não foi medido. ATENÇÃO: calçados têm antidumping contra a China."
+    }
+  }
+}

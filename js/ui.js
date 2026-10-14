@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v6 · 14/10/2026 · foto calibrada';
+  const VERSAO = 'v7 · 14/10/2026 · calculadora + preços';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -414,10 +414,15 @@
      pergunta — assim a redação é da Receita, não minha.
      ============================================================ */
   let PRODUTOS = null;                       // data/produtos.json
+  let PRECOS = null;                         // data/precos.json (faixa de varejo no Brasil)
   let guia = { cat: null, prod: null, cod: null, caminho: [] };
 
   function carregarProdutos() {
-    return fetch('data/produtos.json').then(r => r.json()).then(j => { PRODUTOS = j; });
+    return fetch('data/produtos.json').then(r => r.json()).then(j => { PRODUTOS = j; })
+      // preços são opcionais: se o arquivo não existir, o app segue sem a comparação
+      .then(() => fetch('data/precos.json').then(r => r.json())
+        .then(j => { PRECOS = j.precos || null; })
+        .catch(() => { PRECOS = null; }));
   }
 
   function gReset() { guia = { cat: null, prod: null, cod: null, caminho: [] }; renderGuia(); }
@@ -572,15 +577,32 @@
       ok: 'Nada foi encontrado na base. Ainda assim o Leonardo deve confirmar antes de um pedido grande.'
     };
 
-    let custoHtml = '';
-    if (alvo && alvo.preco > 0 && (alvo.qtd || alvo.moq)) {
-      const c = CUSTOS.calcular(Object.assign({}, alvo, { ncm: ncm, ii: it.ii, ipi: it.ipi }), cfg);
-      custoHtml = `<div class="kpi" style="margin-bottom:12px">
-        <div><div class="k-l">Custo por peça</div><div class="k-v hi">${brl(c.unit)}</div>
-          <div class="k-s">posto no Brasil</div></div>
-        <div><div class="k-l">Multiplicador</div><div class="k-v">${c.multiplo.toFixed(2)}×</div>
-          <div class="k-s">sobre o preço do estande</div></div></div>`;
-    }
+    /* Calculadora de bolso: a pergunta que se faz em pé no estande é
+       "quanto isso custa nacionalizado?". Preço e quantidade bastam —
+       o resto vem da Config. */
+    const qc = Object.assign({ preco: 0, moeda: 'USD', qtd: 1000, cbm: 0.002 }, cfg.rapida || {});
+    if (alvo && alvo.preco > 0) { qc.preco = alvo.preco; qc.moeda = alvo.moeda; }
+    if (alvo && (alvo.qtd || alvo.moq)) { qc.qtd = alvo.qtd || alvo.moq; }
+    if (alvo && alvo.cbm > 0) { qc.cbm = alvo.cbm; }
+
+    const custoHtml = `<div class="card" id="qc-card">
+      <h3 style="margin-bottom:10px">Quanto fica no Brasil</h3>
+      <div class="row">
+        <div class="f"><label for="qc-preco">Preço no estande</label>
+          <input id="qc-preco" type="number" inputmode="decimal" step="0.01" value="${qc.preco || ''}" placeholder="0,00"></div>
+        <div class="f f-sm"><label for="qc-moeda">Moeda</label>
+          <select id="qc-moeda"><option${qc.moeda === 'USD' ? ' selected' : ''}>USD</option><option${qc.moeda === 'CNY' ? ' selected' : ''}>CNY</option></select></div>
+      </div>
+      <div class="row">
+        <div class="f"><label for="qc-qtd">Quantidade</label>
+          <input id="qc-qtd" type="number" inputmode="numeric" value="${qc.qtd}"></div>
+        <div class="f"><label for="qc-cbm">m³ por peça</label>
+          <input id="qc-cbm" type="number" inputmode="decimal" step="0.0001" value="${qc.cbm}"></div>
+      </div>
+      <p class="hint" style="margin:0 0 10px">Caixa de caneca ≈ 0,002 · caixa de sapato ≈ 0,008 ·
+      luminária média ≈ 0,02. Ajuste no olho; erro aqui mexe pouco no total.</p>
+      <div id="qc-saida"></div>
+    </div>`;
 
     $('#g-corpo').innerHTML = `
       <div class="achou">
@@ -608,6 +630,58 @@
              : `<button class="primary big" id="g-escolher">Salvar em um produto</button>`}
       <button class="ghost" id="g-detalhe" style="margin-top:9px">Ver detalhe técnico (para o Leonardo)</button>
       <button class="ghost" id="g-outro" style="margin-top:0">Classificar outro produto</button>`;
+
+    /* ---- calculadora de bolso ---- */
+    const calcRapido = () => {
+      const p = {
+        ncm: ncm, ii: it.ii, ipi: it.ipi, moeda: $('#qc-moeda').value,
+        preco: parseFloat($('#qc-preco').value) || 0,
+        qtd: parseInt($('#qc-qtd').value) || 0,
+        cbm: parseFloat($('#qc-cbm').value) || 0
+      };
+      // sem peso informado, estima pela densidade típica de bem de consumo
+      // embalado (~200 kg/m³); no LCL o que manda é o maior entre m³ e tonelada
+      p.peso = p.cbm * 200;
+      cfg.rapida = { preco: p.preco, moeda: p.moeda, qtd: p.qtd, cbm: p.cbm };
+      DB.setCfg('rapida', cfg.rapida);
+
+      const saida = $('#qc-saida');
+      if (!p.preco || !p.qtd) {
+        saida.innerHTML = '<p class="hint" style="margin:0">Preencha preço e quantidade.</p>';
+        return;
+      }
+      const c = CUSTOS.calcular(p, cfg);
+      const ref = PRECOS ? PRECOS[guia.prod ? guia.prod.n : ''] : null;
+      let refHtml = '';
+      if (ref) {
+        const margemMin = ref.min > 0 ? (1 - c.unitLiquido / ref.min) * 100 : 0;
+        const margemMax = ref.max > 0 ? (1 - c.unitLiquido / ref.max) * 100 : 0;
+        const bom = margemMax >= 35;
+        refHtml = `<div class="alerta ${bom ? 'ok' : 'warn'}" style="margin:12px 0 0">
+          <b>Venda no Brasil: ${brl(ref.min)} a ${brl(ref.max)}</b>
+          Com custo efetivo de ${brl(c.unitLiquido)}, a margem fica entre
+          <b>${margemMin.toFixed(0)}%</b> e <b>${margemMax.toFixed(0)}%</b> sobre o preço de venda.
+          <span class="ref" style="display:block;margin-top:6px">${esc(ref.nota)}</span></div>`;
+      }
+      saida.innerHTML = `
+        <div class="kpi" style="margin-bottom:0">
+          <div><div class="k-l">Custo por peça</div><div class="k-v hi">${brl(c.unit)}</div>
+            <div class="k-s">nacionalizado, tudo incluso</div></div>
+          <div><div class="k-l">Efetivo por peça</div><div class="k-v">${brl(c.unitLiquido)}</div>
+            <div class="k-s">${c.aproveita ? 'descontando créditos' : 'Simples: sem crédito'}</div></div>
+          <div><div class="k-l">Multiplicador</div><div class="k-v">${c.multiplo.toFixed(2)}×</div>
+            <div class="k-s">sobre o preço do estande</div></div>
+          <div><div class="k-l">Total do lote</div><div class="k-v" style="font-size:17px">${brl(c.total)}</div>
+            <div class="k-s">${c.qtd.toLocaleString('pt-BR')} peças</div></div>
+        </div>
+        ${refHtml}
+        <p class="hint">Inclui II, IPI, PIS, COFINS, ICMS, AFRMM, Siscomex, frete e despesas da Config.
+        Antidumping, quando existe, entra por fora.</p>`;
+    };
+    ['qc-preco', 'qc-moeda', 'qc-qtd', 'qc-cbm'].forEach(id => {
+      const e = $('#' + id); if (e) e.oninput = e.onchange = calcRapido;
+    });
+    calcRapido();
 
     const ba = $('#g-atribuir');
     if (ba) ba.onclick = () => { atribuir(alvo, r); gReset(); };
