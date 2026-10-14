@@ -201,3 +201,9 @@ table.br .ref{font-size:10.5px;color:var(--dim2);display:block}
 .alerta.warn{background:#3f2a10;border:1px solid #7a5a1a}
 .alerta.ok{background:#0d3320;border:1px solid #1d6b3f}
 .alerta b{display:block;margin-bottom:4px;font-size:15px}
+
+/* ---------- favorito ---------- */
+.fav{display:inline-block;font-size:25px;line-height:1;color:var(--dim2);cursor:pointer;
+  padding:2px 4px;user-select:none;-webkit-user-select:none}
+.fav.on{color:#fbbf24}
+.fav:active{transform:scale(1.25)}

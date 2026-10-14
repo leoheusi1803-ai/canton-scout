@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v11 · 14/10/2026 · custo por peça correto';
+  const VERSAO = 'v12 · 14/10/2026 · favoritos';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -305,8 +305,12 @@
 
     const els = $('#p-status');
     const usados = STATUS.filter(s => produtos.some(p => (p.status || 'novo') === s.id));
-    els.innerHTML = usados.length > 1
+    const nFav = produtos.filter(p => p.fav).length;
+    const chipFav = nFav
+      ? `<span class="chip${filtroStatus === '__fav' ? ' on' : ''}" data-st="__fav">★ Favoritos ${nFav}</span>` : '';
+    els.innerHTML = (usados.length > 1 || nFav)
       ? `<span class="chip${filtroStatus ? '' : ' on'}" data-st="">Todas situações</span>`
+        + chipFav
         + usados.map(s => {
           const n = produtos.filter(p => (p.status || 'novo') === s.id).length;
           return `<span class="chip${filtroStatus === s.id ? ' on' : ''}" data-st="${s.id}">${esc(s.nome)} ${n}</span>`;
@@ -322,7 +326,8 @@
     const q = BASE.norm($('#p-filtro').value);
     let lista = produtos.slice();
     if (filtroCat) lista = lista.filter(p => p.cat === filtroCat);
-    if (filtroStatus) lista = lista.filter(p => (p.status || 'novo') === filtroStatus);
+    if (filtroStatus === '__fav') lista = lista.filter(p => p.fav);
+    else if (filtroStatus) lista = lista.filter(p => (p.status || 'novo') === filtroStatus);
     if (q) {
       lista = lista.filter(p => BASE.norm([p.nome, p.desc, p.forn, p.estande, p.ncm, p.obs,
         (p.notas || []).map(n => n.txt).join(' ')].join(' ')).includes(q));
@@ -361,6 +366,15 @@
       if (img && foto) img.src = blobUrl(foto.id, foto.blob);
     }));
     el.querySelectorAll('[data-abrir]').forEach(c => c.onclick = () => abrirProduto(c.dataset.abrir));
+    // a estrela não abre o produto: favoritar tem que ser um toque só
+    el.querySelectorAll('[data-fav]').forEach(s => s.onclick = (ev) => {
+      ev.stopPropagation();
+      const p = produtos.find(x => x.id === s.dataset.fav);
+      if (!p) return;
+      p.fav = !p.fav;
+      p.atualizado = Date.now();
+      DB.salvarProduto(p).then(() => { toast(p.fav ? '★ Favoritado' : 'Removido dos favoritos'); renderProdutos(); });
+    });
   }
 
   function custoUnitDe(p) {
@@ -396,7 +410,10 @@
           <div class="it-nome">${esc(p.nome)}</div>
           <div class="it-sub">${esc(sub) || '—'}</div>
         </div>
-        ${cu ? `<div class="sc"><b>${brl(cu)}</b><span>/un</span></div>` : ''}
+        <div style="text-align:right">
+          <span class="fav${p.fav ? ' on' : ''}" data-fav="${p.id}" title="favoritar">${p.fav ? '★' : '☆'}</span>
+          ${cu ? `<div class="sc" style="justify-content:flex-end"><b>${brl(cu)}</b><span>/un</span></div>` : ''}
+        </div>
       </div>
       <div class="it-foot">${tags.join('')}</div>
     </div>`;
@@ -429,6 +446,7 @@
         </table>
         <div class="card" style="margin:12px 0 0">
           <h3 style="margin-bottom:9px">Situação</h3>
+          <label class="chk" style="margin:0 0 12px"><input type="checkbox" id="m-fav"> Marcar como favorito</label>
           <div class="chips" id="m-status">
             ${STATUS.map(s => `<span class="chip${statusDe(p.status).id === s.id ? ' on' : ''}" data-st="${s.id}">${esc(s.nome)}</span>`).join('')}
           </div>
@@ -463,6 +481,11 @@
           .forEach(x => x.classList.toggle('on', x.dataset.st === p.status));
         salvar().then(() => { toast('Situação: ' + statusDe(p.status).nome); renderProdutos(); });
       });
+      $('#m-fav').checked = !!p.fav;
+      $('#m-fav').onchange = () => {
+        p.fav = $('#m-fav').checked;
+        salvar().then(() => { toast(p.fav ? '★ Favoritado' : 'Removido dos favoritos'); renderProdutos(); });
+      };
       $('#m-cat').onchange = () => { p.cat = $('#m-cat').value; salvar().then(renderProdutos); };
       $('#m-add-nota').onclick = () => {
         const txt = $('#m-nota-txt').value.trim();
@@ -1406,7 +1429,7 @@
   }
 
   function exportarCsv() {
-    const cab = ['Categoria', 'Situação', 'Produto', 'NCM', 'Descrição NCM', 'II %', 'IPI %',
+    const cab = ['Favorito', 'Categoria', 'Situação', 'Produto', 'NCM', 'Descrição NCM', 'II %', 'IPI %',
       'PIS %', 'COFINS %', 'Risco', 'Órgãos anuentes',
       'Antidumping', 'Fornecedor', 'Estande', 'Fase', 'Contato', 'Moeda', 'Preço FOB', 'MOQ',
       'Qtd', 'Peso kg', 'CBM', 'Custo/un BRL', 'Custo efetivo/un BRL', 'Multiplicador FOB',
@@ -1416,7 +1439,7 @@
       const c = (p.ncm && typeof p.ii === 'number') ? CUSTOS.calcular(p, cfg) : null;
       const pc = p.ncm ? CUSTOS.pisCofinsDe(p.ncm) : null;
       const ref = PRECOS && PRECOS[p.nomeDic || ''] ? PRECOS[p.nomeDic] : null;
-      return [nomeCat(p.cat), statusDe(p.status).nome, p.nome, p.ncm || '', p.ncmDesc || '',
+      return [p.fav ? 'SIM' : '', nomeCat(p.cat), statusDe(p.status).nome, p.nome, p.ncm || '', p.ncmDesc || '',
         typeof p.ii === 'number' ? p.ii : '', p.ipi === 'NT' ? 'NT' : (typeof p.ipi === 'number' ? p.ipi : ''),
         pc ? pc.pis : '', pc ? pc.cofins : '',
         r ? r.rotulo : 'sem NCM', r ? r.orgaos.join(' / ') : '',
