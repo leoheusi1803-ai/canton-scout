@@ -86,23 +86,33 @@ const SYNC = (() => {
     });
   }
 
-  /* Uma rodada completa. Nunca lança: devolve sempre um relatório. */
-  function sincronizar(produtos, desde, aplicar) {
+  /* Uma rodada completa. Nunca lança: devolve sempre um relatório.
+
+     Duas marcas de tempo, de propósito:
+     - desdeLocal  (relógio DESTE celular) decide o que ainda falta enviar
+     - desdeServidor (relógio do Supabase) decide o que falta receber
+     Usar a mesma para as duas coisas fazia produto parar de ser enviado,
+     porque os relógios não batem. */
+  function sincronizar(produtos, desdeLocal, desdeServidor, aplicar) {
     if (!ativo()) return Promise.resolve({ ok: false, motivo: 'sem código de viagem' });
     if (!navigator.onLine) return Promise.resolve({ ok: false, motivo: 'sem internet' });
     if (rodando) return Promise.resolve({ ok: false, motivo: 'já sincronizando' });
     rodando = true;
     const t0 = Date.now();
+    const marcaLocal = Date.now();
     let enviados = 0;
 
-    return enviar(produtos, desde)
-      .then(n => { enviados = n; return receber(desde); })
+    return enviar(produtos, desdeLocal)
+      .then(n => { enviados = n; return receber(desdeServidor); })
       .then(linhas => aplicar(linhas).then(recebidos => {
         ultimo = {
           ok: true, enviados, recebidos, quando: Date.now(),
           ms: Date.now() - t0,
-          // marca de corte: a hora do servidor da última linha, ou agora
-          corte: linhas.length ? new Date(linhas[linhas.length - 1].atualizado).getTime() : Date.now()
+          localAte: marcaLocal,
+          // corte do servidor: a hora da última linha recebida, ou mantém a anterior
+          corte: linhas.length
+            ? new Date(linhas[linhas.length - 1].atualizado).getTime()
+            : (desdeServidor || 0)
         };
         return ultimo;
       }))

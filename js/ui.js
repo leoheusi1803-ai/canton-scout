@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v14 · 14/10/2026 · sincronização';
+  const VERSAO = 'v15 · 14/10/2026 · sincroniza sozinho';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -264,6 +264,7 @@
         DB.setCfg('ultimoForn', cfg.ultimoForn);
         limparForm(); atualizaContador();
         toast('Salvo: ' + p.nome);
+        agendarSync();
       })
       .catch(e => {
         $('#cap-erro').innerHTML = `<div class="alerta bad" style="margin-bottom:10px">
@@ -273,7 +274,17 @@
   }
 
   function atualizaContador() {
-    $('#count-pill').textContent = produtos.length + (produtos.length === 1 ? ' produto' : ' produtos');
+    const n = produtos.length;
+    let txt = n + (n === 1 ? ' produto' : ' produtos');
+    const pill = $('#count-pill');
+    pill.className = 'pill';
+    if (SYNC.ativo()) {
+      const pend = pendentes_();
+      // mostra a verdade no topo: o que já subiu e o que ainda não
+      if (pend > 0) { txt += ' · ' + pend + '↑'; pill.className = 'pill pill-off'; }
+      else { txt += ' · ✓'; pill.className = 'pill pill-on'; }
+    }
+    pill.textContent = txt;
   }
 
   /* ---------------- lista de produtos ---------------- */
@@ -373,7 +384,7 @@
       if (!p) return;
       p.fav = !p.fav;
       p.atualizado = Date.now();
-      DB.salvarProduto(p).then(() => { toast(p.fav ? '★ Favoritado' : 'Removido dos favoritos'); renderProdutos(); });
+      DB.salvarProduto(p).then(() => { toast(p.fav ? "★ Favoritado" : "Removido dos favoritos"); renderProdutos(); agendarSync(); });
     });
   }
 
@@ -474,7 +485,7 @@
           <button class="ghost danger" id="m-apagar">Apagar produto</button>
         </div>`);
       /* ---- situação, categoria e notas ---- */
-      const salvar = () => { p.atualizado = Date.now(); return DB.salvarProduto(p); };
+      const salvar = () => { p.atualizado = Date.now(); agendarSync(); return DB.salvarProduto(p); };
       $('#modal-body').querySelectorAll('#m-status [data-st]').forEach(c => c.onclick = () => {
         p.status = c.dataset.st;
         $('#modal-body').querySelectorAll('#m-status [data-st]')
@@ -1036,6 +1047,7 @@
         .then(() => {
           produtos.push(p);
           pendentes = [];
+          agendarSync();
           limparForm();
           atualizaContador();
           fecharModal();
@@ -1505,16 +1517,22 @@
          ${esc(s.motivo)}. Os produtos estão salvos no aparelho — tenta de novo quando houver rede.</div>`;
   }
 
+  function pendentes_() {
+    const ate = cfg.syncEnviadoAte || 0;
+    return produtos.filter(p => (p.atualizado || p.criado || 0) > ate).length;
+  }
+
   function sincronizar(manual) {
-    if (!SYNC.ativo()) { if (manual) toast('Preencha o código da viagem'); return Promise.resolve(); }
+    if (!SYNC.ativo()) { if (manual) toast('Preencha o código da viagem'); return Promise.resolve({ ok: false }); }
     if (manual) toast('Sincronizando…');
-    const desde = cfg.syncCorte || 0;
-    return SYNC.sincronizar(produtos, desde, aplicarRecebidos).then(r => {
+    return SYNC.sincronizar(produtos, cfg.syncEnviadoAte || 0, cfg.syncCorte || 0, aplicarRecebidos).then(r => {
       if (r.ok) {
         cfg.syncCorte = r.corte;
+        cfg.syncEnviadoAte = r.localAte;
         DB.setCfg('syncCorte', r.corte);
+        DB.setCfg('syncEnviadoAte', r.localAte);
         atualizaContador();
-        renderProdutos();
+        if (r.recebidos) renderProdutos();
         if (manual || r.recebidos) toast(`${r.enviados} enviado(s), ${r.recebidos} recebido(s)`);
       } else if (manual) {
         toast('Não sincronizou: ' + r.motivo);
@@ -1522,6 +1540,22 @@
       pintarSync();
       return r;
     });
+  }
+
+  /* ---- automático ----
+     A pessoa no estande não vai lembrar de apertar botão. Então o app tenta
+     sozinho: ao abrir, ao voltar para a tela, quando a rede volta, e de
+     tempos em tempos enquanto houver coisa pendente. Tudo em silêncio —
+     falhar é normal com VPN e não pode atrapalhar quem está trabalhando. */
+  let syncTimer = null;
+  function agendarSync(ms) {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => sincronizar(false), ms || 4000);
+  }
+
+  function autoSync() {
+    // roda mesmo sem pendência própria: é assim que chega o que os outros cadastraram
+    if (SYNC.ativo() && navigator.onLine) sincronizar(false);
   }
 
   /* ---------------- exportar / importar ---------------- */
@@ -1686,10 +1720,16 @@
     $('#modal').onclick = (e) => { if (e.target.id === 'modal') fecharModal(); };
     // rede
     rede();
-    window.addEventListener('online', rede);
-    // oportunista: assim que houver rede, tenta sincronizar em segundo plano
-    window.addEventListener('online', () => setTimeout(() => sincronizar(false), 1500));
+    window.addEventListener('online', () => { rede(); agendarSync(1500); });
     window.addEventListener('offline', rede);
+    // ao voltar para o app depois de fotografar ou trocar de aba
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) { rede(); agendarSync(2000); }
+    });
+    // enquanto o app estiver aberto, tenta de tempos em tempos
+    setInterval(autoSync, 90000);
+    // e logo depois de abrir
+    agendarSync(5000);
     // service worker: é o que garante abrir sem internet
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').then(reg => {
