@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v9 · 14/10/2026 · + informática';
+  const VERSAO = 'v10 · 14/10/2026 · salvar pela foto';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -213,12 +213,28 @@
     ['f-nome', 'f-desc', 'f-preco', 'f-moq', 'f-qtd', 'f-peso', 'f-cbm', 'f-obs'].forEach(id => $('#' + id).value = '');
     pendentes = []; renderThumbs();
     document.querySelector('#sugestao').innerHTML = '';
+    document.querySelector('#cap-erro').innerHTML = '';
     // fornecedor/estande/contato ficam: normalmente são vários produtos do mesmo estande
   }
 
   function salvarProduto() {
     const nome = $('#f-nome').value.trim();
-    if (!nome) { toast('Dê um nome ao produto'); $('#f-nome').focus(); return; }
+    const forn = $('#f-forn').value.trim();
+    const contato = $('#f-contato').value.trim();
+    const erro = $('#cap-erro');
+    const faltou = [];
+    if (!nome) faltou.push('produto');
+    if (!forn) faltou.push('fabricante');
+    if (!contato) faltou.push('contato');
+    if (faltou.length) {
+      erro.innerHTML = `<div class="alerta bad" style="margin-bottom:10px">
+        <b>Faltou preencher: ${faltou.join(', ')}</b>
+        O contato do fabricante é o que você não consegue recuperar depois —
+        sem ele a foto não vale nada.</div>`;
+      try { erro.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { }
+      return;
+    }
+    erro.innerHTML = '';
     const id = DB.novoId();
     const p = {
       id, nome,
@@ -241,8 +257,19 @@
     const midias = pendentes.map(m => ({ id: m.id, produtoId: id, blob: m.blob, tipo: m.tipo, nome: m.nome }));
     DB.salvarProduto(p)
       .then(() => Promise.all(midias.map(m => DB.salvarMidia(m))))
-      .then(() => { produtos.push(p); limparForm(); atualizaContador(); toast('Produto salvo · agora classifique na aba NCM'); })
-      .catch(e => toast('Erro ao salvar: ' + e.message));
+      .then(() => {
+        produtos.push(p);
+        // guarda o estande para o próximo produto do mesmo fornecedor
+        cfg.ultimoForn = { forn: p.forn, contato: p.contato, estande: p.estande, fase: p.fase };
+        DB.setCfg('ultimoForn', cfg.ultimoForn);
+        limparForm(); atualizaContador();
+        toast('Salvo: ' + p.nome);
+      })
+      .catch(e => {
+        $('#cap-erro').innerHTML = `<div class="alerta bad" style="margin-bottom:10px">
+          <b>Não consegui salvar</b>${esc(e.message || e)}<br>
+          Se você está no Safari em aba privada, saia dela: o armazenamento fica bloqueado.</div>`;
+      });
   }
 
   function atualizaContador() {
@@ -789,7 +816,8 @@
       <div class="alerta ${r.nivel}"><b>${ALERTA[r.nivel]}</b>${expl[r.nivel]}</div>
       ${custoHtml}
       ${alvo ? `<button class="primary big" id="g-atribuir">Salvar esta NCM em "${esc(alvo.nome)}"</button>`
-             : `<button class="primary big" id="g-escolher">Salvar em um produto</button>`}
+             : `<button class="primary big" id="g-salvar">Salvar este produto</button>
+                ${produtos.length ? '<button class="ghost" id="g-escolher" style="margin-top:9px">Anexar a um produto já salvo</button>' : ''}`}
       <button class="ghost" id="g-detalhe" style="margin-top:9px">Ver detalhe técnico (para o Leonardo)</button>
       <button class="ghost" id="g-outro" style="margin-top:0">Classificar outro produto</button>`;
 
@@ -847,6 +875,12 @@
 
     const ba = $('#g-atribuir');
     if (ba) ba.onclick = () => { atribuir(alvo, r); gReset(); };
+    /* Salvar direto daqui. Antes, quem vinha pela foto caía num beco:
+       o app pedia para "salvar em um produto" que ainda não existia, e o
+       formulário com fabricante e contato nunca aparecia. */
+    const bs = $('#g-salvar');
+    if (bs) bs.onclick = () => formSalvar(ncm, it);
+
     const be = $('#g-escolher');
     if (be) be.onclick = () => {
       if (!produtos.length) { toast('Salve um produto primeiro, na aba Capturar'); return; }
@@ -860,6 +894,112 @@
     };
     $('#g-detalhe').onclick = () => modal(blocoRisco(r));
     $('#g-outro').onclick = gReset;
+  }
+
+  /* Formulário de salvamento vindo da classificação. Pede o que NÃO dá para
+     recuperar depois: quem é o fabricante e como falar com ele. Preço e
+     quantidade já vêm da calculadora; o estande e o contato ficam lembrados,
+     porque no mesmo estande se captura vários produtos seguidos. */
+  function formSalvar(ncm, it) {
+    const ult = cfg.ultimoForn || {};
+    const nomeSugerido = guia.prod ? guia.prod.n.split(' / ')[0] : '';
+    const nomeDigitado = $('#f-nome') ? $('#f-nome').value.trim() : '';
+    const qcP = $('#qc-preco'), qcQ = $('#qc-qtd'), qcC = $('#qc-cbm'), qcM = $('#qc-moeda');
+    const nFotos = pendentes.length;
+
+    modal(`
+      <h1 style="font-size:18px;margin:0 0 3px">Salvar produto</h1>
+      <p class="hint" style="margin:0 0 14px">NCM ${fmtNcm(ncm)} · ${esc(it.desc.slice(0, 60))}
+      ${nFotos ? ' · ' + nFotos + ' foto' + (nFotos > 1 ? 's' : '') : ''}</p>
+
+      <div class="f"><label for="s-nome">Produto <b>*</b></label>
+        <input id="s-nome" type="text" value="${esc(nomeDigitado || nomeSugerido)}" placeholder="ex.: caneca branca 400ml"></div>
+
+      <div class="f"><label for="s-forn">Fabricante / fornecedor <b>*</b></label>
+        <input id="s-forn" type="text" value="${esc(ult.forn || '')}" placeholder="nome da empresa no estande"></div>
+
+      <div class="f"><label for="s-contato">Contato — WeChat, e-mail ou telefone <b>*</b></label>
+        <input id="s-contato" type="text" value="${esc(ult.contato || '')}" placeholder="peça o cartão e copie o WeChat ID"></div>
+
+      <div class="row">
+        <div class="f"><label for="s-estande">Nº do estande</label>
+          <input id="s-estande" type="text" value="${esc(ult.estande || '')}" placeholder="ex.: 11.2 K23"></div>
+        <div class="f"><label for="s-fase">Fase</label>
+          <select id="s-fase"><option value="2">Fase 2</option><option value="3"${ult.fase === '3' ? ' selected' : ''}>Fase 3</option><option value="1"${ult.fase === '1' ? ' selected' : ''}>Fase 1</option></select></div>
+      </div>
+
+      <div class="row">
+        <div class="f"><label for="s-preco">Preço unit.</label>
+          <input id="s-preco" type="number" inputmode="decimal" step="0.01" value="${qcP ? qcP.value : ''}"></div>
+        <div class="f f-sm"><label for="s-moeda">Moeda</label>
+          <select id="s-moeda"><option>USD</option><option${qcM && qcM.value === 'CNY' ? ' selected' : ''}>CNY</option></select></div>
+      </div>
+      <div class="row">
+        <div class="f"><label for="s-qtd">Quantidade</label>
+          <input id="s-qtd" type="number" inputmode="numeric" value="${qcQ ? qcQ.value : ''}"></div>
+        <div class="f"><label for="s-moq">MOQ do fornecedor</label>
+          <input id="s-moq" type="number" inputmode="numeric" placeholder="peças"></div>
+      </div>
+
+      <div class="f"><label for="s-obs">Observações</label>
+        <textarea id="s-obs" rows="2" placeholder="qualidade, prazo, amostra, o que ele falou…"></textarea></div>
+
+      <div id="s-erro"></div>
+      <button class="primary big" id="s-ok">Salvar</button>`);
+
+    $('#s-ok').onclick = () => {
+      const nome = $('#s-nome').value.trim();
+      const forn = $('#s-forn').value.trim();
+      const contato = $('#s-contato').value.trim();
+      if (!nome || !forn || !contato) {
+        $('#s-erro').innerHTML = `<div class="alerta bad" style="margin-bottom:10px">
+          <b>Faltou preencher</b>Produto, fabricante e contato são obrigatórios.
+          Sem o contato você não consegue fechar nada depois da feira.</div>`;
+        return;
+      }
+      const id = DB.novoId();
+      const p = {
+        id, nome, forn, contato,
+        desc: $('#f-desc') ? $('#f-desc').value.trim() : '',
+        estande: $('#s-estande').value.trim(),
+        fase: $('#s-fase').value,
+        preco: parseFloat($('#s-preco').value) || 0,
+        moeda: $('#s-moeda').value,
+        qtd: parseInt($('#s-qtd').value) || 0,
+        moq: parseInt($('#s-moq').value) || 0,
+        cbm: qcC ? (parseFloat(qcC.value) || 0) : 0,
+        peso: qcC ? (parseFloat(qcC.value) || 0) * 200 : 0,
+        obs: $('#s-obs').value.trim(),
+        cond: condAtual,
+        ncm: ncm, ncmDesc: it.desc, ii: it.ii, ipi: it.ipi,
+        cat: guia.prod ? guia.prod.cat : '',
+        nomeDic: guia.prod ? guia.prod.n : '',
+        status: 'novo', notas: [],
+        criado: Date.now(), atualizado: Date.now()
+      };
+      // lembra o estande para o próximo produto do mesmo fornecedor
+      cfg.ultimoForn = { forn, contato, estande: p.estande, fase: p.fase };
+      DB.setCfg('ultimoForn', cfg.ultimoForn);
+
+      const midias = pendentes.map(m => ({ id: m.id, produtoId: id, blob: m.blob, tipo: m.tipo, nome: m.nome }));
+      DB.salvarProduto(p)
+        .then(() => Promise.all(midias.map(m => DB.salvarMidia(m))))
+        .then(() => {
+          produtos.push(p);
+          pendentes = [];
+          limparForm();
+          atualizaContador();
+          fecharModal();
+          gReset();
+          toast('Salvo: ' + nome);
+          ir('produtos');
+        })
+        .catch(e => {
+          $('#s-erro').innerHTML = `<div class="alerta bad" style="margin-bottom:10px">
+            <b>Não consegui salvar</b>${esc(e.message || e)}<br>
+            Se você está no Safari em aba privada, saia dela: o armazenamento fica bloqueado.</div>`;
+        });
+    };
   }
 
   function gNaoAchei() {
@@ -1306,6 +1446,13 @@
       .then(ps => {
         produtos = ps || [];
         atualizaContador();
+        // repõe o estande do último produto: num mesmo fornecedor são vários
+        if (cfg.ultimoForn) {
+          $('#f-forn').value = cfg.ultimoForn.forn || '';
+          $('#f-contato').value = cfg.ultimoForn.contato || '';
+          $('#f-estande').value = cfg.ultimoForn.estande || '';
+          if (cfg.ultimoForn.fase) $('#f-fase').value = cfg.ultimoForn.fase;
+        }
         pintarConfig(); ligarConfig();
         buscarNcm();
         $('#splash').classList.add('off');

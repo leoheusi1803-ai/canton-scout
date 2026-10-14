@@ -84,16 +84,16 @@
       </div>
 
       <div class="f">
-        <label for="f-forn">Fornecedor / estande</label>
-        <input id="f-forn" type="text" placeholder="nome da empresa">
+        <label for="f-forn">Fabricante / fornecedor <b>*</b></label>
+        <input id="f-forn" type="text" placeholder="nome da empresa no estande">
       </div>
       <div class="row">
         <div class="f"><label for="f-estande">Nº do estande</label><input id="f-estande" type="text" placeholder="ex.: 11.2 K23"></div>
         <div class="f"><label for="f-fase">Fase</label><select id="f-fase"><option value="2">Fase 2</option><option value="3">Fase 3</option><option value="1">Fase 1</option></select></div>
       </div>
       <div class="f">
-        <label for="f-contato">Contato (WeChat / e-mail / tel.)</label>
-        <input id="f-contato" type="text" placeholder="cole o WeChat ID aqui">
+        <label for="f-contato">Contato — WeChat, e-mail ou telefone <b>*</b></label>
+        <input id="f-contato" type="text" placeholder="peça o cartão e copie o WeChat ID">
       </div>
 
       <div class="f">
@@ -109,8 +109,10 @@
         <textarea id="f-obs" rows="2" placeholder="qualidade, amostra prometida, prazo, negociação…"></textarea>
       </div>
 
+      <div id="cap-erro"></div>
       <button id="btn-salvar" class="primary big">Salvar produto</button>
-      <p class="hint">Salva no aparelho, sem internet. A classificação fiscal você faz na aba <b>NCM</b> — pelo produto salvo ou direto na busca.</p>
+      <p class="hint">Salva no aparelho, sem internet. Fabricante e contato são obrigatórios:
+      sem eles você não fecha nada depois da feira.</p>
     </div>
   </section>
 
