@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v12 · 14/10/2026 · favoritos';
+  const VERSAO = 'v13 · 14/10/2026 · custos unificados + AirDrop';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -1193,11 +1193,59 @@
     const p = produtos.find(x => x.id === $('#c-produto').value);
     const el = $('#c-saida');
     if (!p) { el.innerHTML = '<div class="empty">Escolha um produto acima.</div>'; return; }
-    const aviso = (!p.qtd && !p.moq)
-      ? `<div class="card tight"><p class="warn">Produto sem quantidade: a conta está usando 1 peça,
-         então o frete e as despesas fixas caem todos em cima dela. Preencha MOQ ou quantidade.</p></div>`
-      : '';
-    el.innerHTML = aviso + extratoHtml(p, CUSTOS.calcular(p, cfg));
+
+    /* Os mesmos controles da calculadora da aba NCM. Antes esta tela usava
+       só o que estava salvo no produto e sempre rateava as despesas do
+       embarque — com quantidade 1 isso dava R$ 4.887 num tênis de USD 50.
+       Duas telas discordando é pior que uma errada.                      */
+    const ratear = cfg.custosRatear !== false;   // aqui o padrão é ratear: é a conta do lote
+    el.innerHTML = `
+      <div class="card">
+        <div class="row">
+          <div class="f"><label for="cx-preco">Preço unit. no estande</label>
+            <input id="cx-preco" type="number" inputmode="decimal" step="0.01" value="${p.preco || ''}"></div>
+          <div class="f f-sm"><label for="cx-moeda">Moeda</label>
+            <select id="cx-moeda"><option>USD</option><option${p.moeda === 'CNY' ? ' selected' : ''}>CNY</option></select></div>
+        </div>
+        <div class="row">
+          <div class="f"><label for="cx-qtd">Quantidade do pedido</label>
+            <input id="cx-qtd" type="number" inputmode="numeric" value="${p.qtd || p.moq || ''}" placeholder="peças"></div>
+          <div class="f"><label for="cx-cbm">m³ por peça</label>
+            <input id="cx-cbm" type="number" inputmode="decimal" step="0.0001" value="${p.cbm || 0.002}"></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="cx-ratear"${ratear ? ' checked' : ''}>
+          Ratear despesas do embarque (despachante, THC, Siscomex)</label>
+        <p class="hint">Aqui o padrão é ratear, porque esta é a conta do lote inteiro.
+        O que você mudar fica salvo no produto.</p>
+      </div>
+      <div id="cx-saida"></div>`;
+
+    const recalc = () => {
+      p.preco = parseFloat($('#cx-preco').value) || 0;
+      p.moeda = $('#cx-moeda').value;
+      p.qtd = parseInt($('#cx-qtd').value) || 0;
+      p.cbm = parseFloat($('#cx-cbm').value) || 0;
+      p.peso = p.peso || p.cbm * 200;
+      p.atualizado = Date.now();
+      DB.salvarProduto(p);
+      const r = $('#cx-ratear').checked;
+      cfg.custosRatear = r; DB.setCfg('custosRatear', r);
+      const cfgC = r ? cfg : Object.assign({}, cfg, { despesasBrl: 0, siscomexBrl: 0 });
+      const qtdReal = p.qtd || p.moq || 0;
+      const avisoQtd = (r && qtdReal > 0 && qtdReal < 50)
+        ? `<div class="alerta bad" style="margin-bottom:12px"><b>Quantidade muito baixa para ratear</b>
+           ${brl(cfg.despesasBrl + cfg.siscomexBrl)} de despesas do embarque divididos por
+           ${qtdReal} peça${qtdReal > 1 ? 's' : ''} distorcem o custo unitário. Coloque a quantidade real
+           do pedido, ou desmarque o rateio para ver só o custo do produto.</div>`
+        : (qtdReal === 0
+          ? `<div class="alerta warn" style="margin-bottom:12px"><b>Sem quantidade</b>
+             A conta está usando 1 peça. Preencha a quantidade do pedido acima.</div>` : '');
+      $('#cx-saida').innerHTML = avisoQtd + extratoHtml(p, CUSTOS.calcular(p, cfgC));
+    };
+    ['cx-preco', 'cx-moeda', 'cx-qtd', 'cx-cbm', 'cx-ratear'].forEach(id => {
+      const e = $('#' + id); if (e) e.oninput = e.onchange = recalc;
+    });
+    recalc();
   }
 
   function simularSolto(r) {
@@ -1401,7 +1449,21 @@
   }
 
   /* ---------------- exportar / importar ---------------- */
+  /* No iPhone, baixar um arquivo joga ele no app Arquivos e a pessoa ainda
+     precisa achar e compartilhar. Com o menu nativo de compartilhamento o
+     AirDrop aparece direto — e AirDrop é ponto a ponto, funciona sem
+     internet nenhuma, que é a situação de vocês na China. */
   function baixar(nome, blob) {
+    const file = new File([blob], nome, { type: blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: nome })
+        .catch(() => baixarDireto(nome, blob));
+      return;
+    }
+    baixarDireto(nome, blob);
+  }
+
+  function baixarDireto(nome, blob) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = nome;
