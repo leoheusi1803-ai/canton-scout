@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080d18">
+<title>Canton Scout — comece aqui</title>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+<style>
+  body{padding-bottom:40px}
+  .capa{padding:52px 20px 36px;text-align:center;
+    background:radial-gradient(120% 90% at 50% 0%,#1b2f61 0%,var(--bg) 66%)}
+  .marca{width:72px;height:72px;border-radius:21px;margin:0 auto 20px;
+    background:linear-gradient(145deg,var(--ac),#8b5cf6);box-shadow:0 14px 36px -10px var(--ac-sombra);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:27px;color:#fff}
+  .capa h1{font-size:30px;line-height:1.15;margin:0 0 12px;letter-spacing:-.03em}
+  .capa p{color:var(--dim);font-size:15px;line-height:1.6;margin:0 auto;max-width:460px}
+  .wrap{padding:0 16px;max-width:620px;margin:0 auto}
+  .abrir{display:block;text-align:center;text-decoration:none;color:#fff;font-weight:700;font-size:17px;
+    background:linear-gradient(180deg,var(--ac),var(--ac2));padding:17px;border-radius:14px;
+    margin:26px auto 10px;max-width:420px;box-shadow:0 10px 28px -10px var(--ac-sombra)}
+  h2{font-size:19px;margin:34px 0 14px;letter-spacing:-.02em}
+  .passos{counter-reset:p;display:grid;gap:10px}
+  .passo{display:flex;gap:13px;align-items:flex-start;background:linear-gradient(180deg,var(--card),#121c2e);
+    border:1px solid var(--line);border-radius:var(--r);padding:15px}
+  .passo::before{counter-increment:p;content:counter(p);flex:0 0 auto;width:27px;height:27px;
+    border-radius:50%;background:var(--ac);color:#fff;font-weight:700;font-size:14px;
+    display:flex;align-items:center;justify-content:center}
+  .passo div{font-size:14px;line-height:1.55}
+  .passo b{display:block;margin-bottom:3px}
+  .passo small{color:var(--dim2);font-size:12px}
+  .recursos{display:grid;gap:10px}
+  .rec{background:linear-gradient(180deg,var(--card),#121c2e);border:1px solid var(--line);
+    border-radius:var(--r);padding:16px}
+  .rec .ic{font-size:24px;line-height:1;margin-bottom:9px}
+  .rec b{display:block;font-size:15px;margin-bottom:5px}
+  .rec p{margin:0;font-size:13px;color:var(--dim);line-height:1.6}
+  .so{display:flex;gap:7px;margin:0 0 14px}
+  .so button{flex:1;background:var(--bg2);border:1px solid var(--line);color:var(--dim);
+    font:inherit;font-weight:650;font-size:14px;padding:11px;border-radius:11px;cursor:pointer}
+  .so button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+  .rodape{text-align:center;color:var(--dim2);font-size:11.5px;margin:36px 0 0;line-height:1.7}
+  @media(min-width:620px){ .recursos{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <div class="marca">CS</div>
+  <h1>Canton Scout</h1>
+  <p>Fotografe um produto no estande e saiba na hora a classificação fiscal,
+  as barreiras que podem travar a importação e quanto ele custa posto no Brasil.
+  <b>Tudo sem internet</b>, porque na China não vai ter.</p>
+</div>
+
+<div class="wrap">
+  <a class="abrir" href="./">Abrir o aplicativo</a>
+  <p style="text-align:center;color:var(--dim2);font-size:12.5px;margin:0 0 6px">
+    Já instalou? É só abrir pelo ícone na tela de início.</p>
+
+  <h2>Instale antes de viajar</h2>
+  <p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin:0 0 16px">
+    Aberto pelo navegador o app até funciona, mas <b>não abre sem internet</b> e o
+    celular pode apagar os produtos. Instalado na tela de início, ele é seu offline.</p>
+
+  <div class="so">
+    <button id="b-ios" class="on">iPhone</button>
+    <button id="b-and">Android</button>
+  </div>
+
+  <div class="passos" id="p-ios">
+    <div class="passo"><div><b>Abra no Safari</b>
+      <small>Não funciona pelo Chrome nem pelo link do WhatsApp — tem que ser o Safari.</small></div></div>
+    <div class="passo"><div><b>Toque no botão de compartilhar</b>
+      <small>O quadrado com a seta para cima, na barra de baixo.</small></div></div>
+    <div class="passo"><div><b>Role e toque em “Adicionar à Tela de Início”</b></div></div>
+    <div class="passo"><div><b>Abra pelo ícone novo</b>
+      <small>A barra do Safari some. Espere a barra de carregamento terminar: são 22 MB.</small></div></div>
+  </div>
+
+  <div class="passos" id="p-and" hidden>
+    <div class="passo"><div><b>Abra no Chrome</b></div></div>
+    <div class="passo"><div><b>Toque no menu ⋮</b><small>Canto superior direito.</small></div></div>
+    <div class="passo"><div><b>Toque em “Instalar aplicativo”</b>
+      <small>Ou “Adicionar à tela inicial”, dependendo da versão.</small></div></div>
+    <div class="passo"><div><b>Abra pelo ícone novo</b>
+      <small>Espere a barra de carregamento terminar: são 22 MB.</small></div></div>
+  </div>
+
+  <h2>Depois de instalar, confirme</h2>
+  <div class="passos">
+    <div class="passo"><div><b>Config → Testar modo offline</b>
+      <small>Tem que dar verde em todos os itens.</small></div></div>
+    <div class="passo"><div><b>Config → Sincronizar</b>
+      <small>Preencha o código da viagem (o mesmo nos três celulares) e seu nome.</small></div></div>
+    <div class="passo"><div><b>A prova real: modo avião</b>
+      <small>Ligue, feche o app e abra de novo. Se abrir e a busca de NCM funcionar, está pronto.</small></div></div>
+  </div>
+
+  <h2>O que ele faz</h2>
+  <div class="recursos">
+    <div class="rec"><div class="ic">📷</div><b>Reconhece pela foto</b>
+      <p>O modelo roda dentro do celular. Fotografou, ele sugere o produto; você confirma o material
+      e sai a NCM.</p></div>
+    <div class="rec"><div class="ic">⚠️</div><b>Avisa das armadilhas</b>
+      <p>Antidumping, licença prévia, órgão anuente. Louça de mesa, calçado e ventilador têm
+      antidumping contra a China — dá para ver isso no estande.</p></div>
+    <div class="rec"><div class="ic">💰</div><b>Calcula o custo real</b>
+      <p>II, IPI, PIS, COFINS, ICMS, AFRMM e frete. Diz quanto a peça custa posta no Brasil e
+      quantas vezes o preço do estande.</p></div>
+    <div class="rec"><div class="ic">📦</div><b>Organiza o garimpo</b>
+      <p>Nota de 1 a 10, favoritos, categorias, anotações e situação de cada negociação.
+      Sai tudo em planilha depois.</p></div>
+  </div>
+
+  <h2>Por que offline</h2>
+  <p style="color:var(--dim);font-size:13.5px;line-height:1.7;margin:0">
+    Na China o WiFi do pavilhão e os chips locais ficam atrás do Great Firewall, que bloqueia as
+    APIs de inteligência artificial, o Google e quase tudo que um aplicativo de nuvem precisaria.
+    Por isso as <b>10.516 posições da NCM</b>, as alíquotas, as regras de anuência, as medidas
+    antidumping e o modelo de reconhecimento de imagem vão todos gravados no aparelho.
+    Nenhuma consulta sai do celular.</p>
+
+  <p class="rodape">
+    Dados oficiais: TEC (Gecex), TIPI (Receita Federal), Tratamento Administrativo (Siscomex)
+    e medidas de defesa comercial (MDIC/DECOM).<br>
+    É ferramenta de triagem, não parecer fiscal — confirme com seu despachante antes de fechar pedido.
+  </p>
+</div>
+
+<script>
+  const bi = document.getElementById('b-ios'), ba = document.getElementById('b-and');
+  const pi = document.getElementById('p-ios'), pa = document.getElementById('p-and');
+  const mostrar = (ios) => {
+    bi.classList.toggle('on', ios); ba.classList.toggle('on', !ios);
+    pi.hidden = !ios; pa.hidden = ios;
+  };
+  bi.onclick = () => mostrar(true);
+  ba.onclick = () => mostrar(false);
+  // abre já na aba do aparelho de quem está lendo
+  mostrar(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent));
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v16 · 15/10/2026 · nota de 1 a 10';
+  const VERSAO = 'v17 · 15/10/2026 · visual';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -1691,8 +1691,28 @@
     p.className = 'pill ' + (on ? 'pill-on' : 'pill-off');
   }
 
+  /* Rodar no navegador em vez do app instalado é a falha silenciosa mais
+     cara: tudo parece funcionar, mas sem service worker não abre offline e
+     o iOS descarta os dados depois de alguns dias. Então o app avisa. */
+  function avisoInstalacao() {
+    const el = $('#instalar');
+    if (!el) return;
+    const standalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+    if (standalone) { el.hidden = true; return; }
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    el.hidden = false;
+    el.innerHTML = `<b>Falta instalar na tela de início</b>
+      <p>Assim, do navegador, o app <b>não abre sem internet</b> e o celular pode
+      apagar os produtos depois de alguns dias. ${ios
+        ? 'No Safari: toque no botão de <b>compartilhar</b> (quadrado com seta) e depois em <b>Adicionar à Tela de Início</b>.'
+        : 'No Chrome: menu <b>⋮</b> e depois <b>Instalar aplicativo</b>.'}
+      <br><a href="comecar.html">Ver o passo a passo com imagens →</a></p>`;
+  }
+
   function iniciar() {
     const msg = $('#splash-msg'), bar = $('#splash-bar');
+    avisoInstalacao();
 
     // pede armazenamento persistente: sem isso o navegador pode apagar as fotos
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
