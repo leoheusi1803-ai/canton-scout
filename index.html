@@ -54,6 +54,18 @@
 
     <div class="card">
       <div class="f">
+        <label>Sua nota para este produto <b>*</b></label>
+        <div class="notas" id="f-nota">
+          <button type="button" data-nota="1">1</button><button type="button" data-nota="2">2</button>
+          <button type="button" data-nota="3">3</button><button type="button" data-nota="4">4</button>
+          <button type="button" data-nota="5">5</button><button type="button" data-nota="6">6</button>
+          <button type="button" data-nota="7">7</button><button type="button" data-nota="8">8</button>
+          <button type="button" data-nota="9">9</button><button type="button" data-nota="10">10</button>
+        </div>
+        <p class="hint">Impressão sua, no estande: qualidade, preço, atendimento.
+        É por ela que vocês vão ordenar tudo depois da feira.</p>
+      </div>
+      <div class="f">
         <label for="f-nome">Produto <b>*</b></label>
         <input id="f-nome" type="text" placeholder="ex.: caneca de cerâmica 400ml" autocomplete="off">
       </div>
@@ -123,7 +135,7 @@
       <div class="seg wide" id="p-ord">
         <button type="button" class="on" data-v="data">Mais recentes</button>
         <button type="button" data-v="risco">Pior risco</button>
-        <button type="button" data-v="custo">Menor custo</button>
+        <button type="button" data-v="nota">Melhor nota</button>
       </div>
       <div id="p-cats" class="chips"></div>
       <div id="p-status" class="chips"></div>

@@ -207,3 +207,14 @@ table.br .ref{font-size:10.5px;color:var(--dim2);display:block}
   padding:2px 4px;user-select:none;-webkit-user-select:none}
 .fav.on{color:#fbbf24}
 .fav:active{transform:scale(1.25)}
+
+/* ---------- nota de 1 a 10 ---------- */
+.notas{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.notas button{background:var(--card);border:1px solid var(--line);color:var(--txt);
+  font:inherit;font-size:16px;font-weight:650;padding:12px 0;border-radius:10px;cursor:pointer}
+.notas button:active{background:var(--card2)}
+.notas button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.nota-sel{display:inline-block;min-width:30px;padding:3px 7px;border-radius:8px;margin-bottom:3px;
+  background:var(--line);color:var(--txt);font-weight:700;font-size:15px;text-align:center}
+.nota-sel.alta{background:#0d3320;color:#4ade80}
+.nota-sel.baixa{background:#43161a;color:#fca5a5}

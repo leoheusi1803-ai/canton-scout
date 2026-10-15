@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v15 · 14/10/2026 · sincroniza sozinho';
+  const VERSAO = 'v16 · 15/10/2026 · nota de 1 a 10';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -14,6 +14,7 @@
   let produtos = [];
   let pendentes = [];          // mídias da captura ainda não salva
   let condAtual = 'novo';
+  let notaCaptura = 0;
   let ordem = 'data';
   let ultimaFoto = null;
   let filtroCat = '';            // categoria selecionada na aba Produtos
@@ -212,6 +213,8 @@
   function limparForm() {
     ['f-nome', 'f-desc', 'f-preco', 'f-moq', 'f-qtd', 'f-peso', 'f-cbm', 'f-obs'].forEach(id => $('#' + id).value = '');
     pendentes = []; renderThumbs();
+    notaCaptura = 0;
+    document.querySelectorAll('#f-nota button').forEach(b => b.classList.remove('on'));
     document.querySelector('#sugestao').innerHTML = '';
     document.querySelector('#cap-erro').innerHTML = '';
     // fornecedor/estande/contato ficam: normalmente são vários produtos do mesmo estande
@@ -223,6 +226,7 @@
     const contato = $('#f-contato').value.trim();
     const erro = $('#cap-erro');
     const faltou = [];
+    if (!notaCaptura) faltou.push('nota');
     if (!nome) faltou.push('produto');
     if (!forn) faltou.push('fabricante');
     if (!contato) faltou.push('contato');
@@ -237,7 +241,7 @@
     erro.innerHTML = '';
     const id = DB.novoId();
     const p = {
-      id, nome,
+      id, nome, nota: notaCaptura,
       desc: $('#f-desc').value.trim(),
       preco: parseFloat($('#f-preco').value) || 0,
       moeda: $('#f-moeda').value,
@@ -346,7 +350,7 @@
     const riscoDe = (p) => p.ncm ? ({ ok: 0, warn: 1, mid: 2, bad: 3 })[BASE.risco(p.ncm, { cond: p.cond, texto: p.nome + ' ' + p.desc }).nivel] : -1;
     if (ordem === 'data') lista.sort((a, b) => b.criado - a.criado);
     if (ordem === 'risco') lista.sort((a, b) => riscoDe(b) - riscoDe(a) || b.criado - a.criado);
-    if (ordem === 'custo') lista.sort((a, b) => (custoUnitDe(a) || 9e9) - (custoUnitDe(b) || 9e9));
+    if (ordem === 'nota') lista.sort((a, b) => (b.nota || 0) - (a.nota || 0) || b.criado - a.criado);
 
     // resumo do que está filtrado: o número que interessa no fim do dia
     const res = $('#p-resumo');
@@ -422,6 +426,7 @@
           <div class="it-sub">${esc(sub) || '—'}</div>
         </div>
         <div style="text-align:right">
+          ${p.nota ? `<div class="nota-sel ${p.nota >= 8 ? 'alta' : (p.nota <= 4 ? 'baixa' : '')}">${p.nota}</div>` : ''}
           <span class="fav${p.fav ? ' on' : ''}" data-fav="${p.id}" title="favoritar">${p.fav ? '★' : '☆'}</span>
           ${cu ? `<div class="sc" style="justify-content:flex-end"><b>${brl(cu)}</b><span>/un</span></div>` : ''}
         </div>
@@ -456,7 +461,12 @@
           ${p.obs ? linhaInfo('Observações', p.obs) : ''}
         </table>
         <div class="card" style="margin:12px 0 0">
-          <h3 style="margin-bottom:9px">Situação</h3>
+          <h3 style="margin-bottom:9px">Nota de 1 a 10</h3>
+          <div class="notas" id="m-nota">
+            ${[1,2,3,4,5,6,7,8,9,10].map(n =>
+              `<button type="button" data-nota="${n}" class="${p.nota === n ? 'on' : ''}">${n}</button>`).join('')}
+          </div>
+          <h3 style="margin:14px 0 9px">Situação</h3>
           <label class="chk" style="margin:0 0 12px"><input type="checkbox" id="m-fav"> Marcar como favorito</label>
           <div class="chips" id="m-status">
             ${STATUS.map(s => `<span class="chip${statusDe(p.status).id === s.id ? ' on' : ''}" data-st="${s.id}">${esc(s.nome)}</span>`).join('')}
@@ -472,10 +482,10 @@
         </div>
 
         <div class="card" style="margin:12px 0 0">
-          <h3 style="margin-bottom:9px">Notas</h3>
+          <h3 style="margin-bottom:9px">Anotações</h3>
           <div id="m-notas">${renderNotas(p)}</div>
           <textarea id="m-nota-txt" rows="2" placeholder="o que aconteceu: preço que ele aceitou, prazo, amostra, concorrente…"></textarea>
-          <button class="ghost" id="m-add-nota" style="margin-top:8px">Adicionar nota</button>
+          <button class="ghost" id="m-add-nota" style="margin-top:8px">Adicionar anotação</button>
         </div>
 
         ${r ? blocoRisco(r) : '<p class="warn">Sem NCM atribuída. Classifique para ver barreiras e custo.</p>'}
@@ -492,6 +502,12 @@
           .forEach(x => x.classList.toggle('on', x.dataset.st === p.status));
         salvar().then(() => { toast('Situação: ' + statusDe(p.status).nome); renderProdutos(); });
       });
+      $('#modal-body').querySelectorAll('#m-nota button').forEach(b => b.onclick = () => {
+        p.nota = +b.dataset.nota;
+        $('#modal-body').querySelectorAll('#m-nota button')
+          .forEach(x => x.classList.toggle('on', +x.dataset.nota === p.nota));
+        salvar().then(() => { toast('Nota ' + p.nota); renderProdutos(); });
+      });
       $('#m-fav').checked = !!p.fav;
       $('#m-fav').onchange = () => {
         p.fav = $('#m-fav').checked;
@@ -507,7 +523,7 @@
         salvar().then(() => {
           $('#m-notas').innerHTML = renderNotas(p);
           ligarApagarNota(p);
-          toast('Nota salva');
+          toast('Anotação salva');
           renderProdutos();
         });
       };
@@ -972,6 +988,16 @@
       <p class="hint" style="margin:0 0 14px">NCM ${fmtNcm(ncm)} · ${esc(it.desc.slice(0, 60))}
       ${nFotos ? ' · ' + nFotos + ' foto' + (nFotos > 1 ? 's' : '') : ''}</p>
 
+      <div class="card" style="margin:0 0 14px;background:var(--bg2)">
+        <label style="display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin-bottom:9px">
+          Sua nota para este produto <b>*</b></label>
+        <div class="notas" id="s-nota">
+          ${[1,2,3,4,5,6,7,8,9,10].map(n => `<button type="button" data-nota="${n}">${n}</button>`).join('')}
+        </div>
+        <p class="hint" style="margin:9px 0 0">Impressão sua, no calor do estande: qualidade, preço,
+        atendimento. É por ela que vocês vão ordenar tudo depois da feira.</p>
+      </div>
+
       <div class="f"><label for="s-nome">Produto <b>*</b></label>
         <input id="s-nome" type="text" value="${esc(nomeDigitado || nomeSugerido)}" placeholder="ex.: caneca branca 400ml"></div>
 
@@ -1007,19 +1033,33 @@
       <div id="s-erro"></div>
       <button class="primary big" id="s-ok">Salvar</button>`);
 
+    let notaEscolhida = 0;
+    $('#modal-body').querySelectorAll('#s-nota button').forEach(b => b.onclick = () => {
+      notaEscolhida = +b.dataset.nota;
+      $('#modal-body').querySelectorAll('#s-nota button')
+        .forEach(x => x.classList.toggle('on', +x.dataset.nota === notaEscolhida));
+    });
+
     $('#s-ok').onclick = () => {
       const nome = $('#s-nome').value.trim();
       const forn = $('#s-forn').value.trim();
       const contato = $('#s-contato').value.trim();
-      if (!nome || !forn || !contato) {
+      const faltou = [];
+      if (!notaEscolhida) faltou.push('nota');
+      if (!nome) faltou.push('produto');
+      if (!forn) faltou.push('fabricante');
+      if (!contato) faltou.push('contato');
+      if (faltou.length) {
         $('#s-erro').innerHTML = `<div class="alerta bad" style="margin-bottom:10px">
-          <b>Faltou preencher</b>Produto, fabricante e contato são obrigatórios.
-          Sem o contato você não consegue fechar nada depois da feira.</div>`;
+          <b>Faltou preencher: ${faltou.join(', ')}</b>
+          A nota e o contato são o que você não recupera depois — a impressão some
+          e o fornecedor não se acha sozinho.</div>`;
         return;
       }
       const id = DB.novoId();
       const p = {
         id, nome, forn, contato,
+        nota: notaEscolhida,
         desc: $('#f-desc') ? $('#f-desc').value.trim() : '',
         estande: $('#s-estande').value.trim(),
         fase: $('#s-fase').value,
@@ -1601,7 +1641,7 @@
   }
 
   function exportarCsv() {
-    const cab = ['Favorito', 'Categoria', 'Situação', 'Produto', 'NCM', 'Descrição NCM', 'II %', 'IPI %',
+    const cab = ['Nota', 'Favorito', 'Categoria', 'Situação', 'Produto', 'NCM', 'Descrição NCM', 'II %', 'IPI %',
       'PIS %', 'COFINS %', 'Risco', 'Órgãos anuentes',
       'Antidumping', 'Fornecedor', 'Estande', 'Fase', 'Contato', 'Moeda', 'Preço FOB', 'MOQ',
       'Qtd', 'Peso kg', 'CBM', 'Custo/un BRL', 'Custo efetivo/un BRL', 'Multiplicador FOB',
@@ -1611,7 +1651,7 @@
       const c = (p.ncm && typeof p.ii === 'number') ? CUSTOS.calcular(p, cfg) : null;
       const pc = p.ncm ? CUSTOS.pisCofinsDe(p.ncm) : null;
       const ref = PRECOS && PRECOS[p.nomeDic || ''] ? PRECOS[p.nomeDic] : null;
-      return [p.fav ? 'SIM' : '', nomeCat(p.cat), statusDe(p.status).nome, p.nome, p.ncm || '', p.ncmDesc || '',
+      return [p.nota || '', p.fav ? 'SIM' : '', nomeCat(p.cat), statusDe(p.status).nome, p.nome, p.ncm || '', p.ncmDesc || '',
         typeof p.ii === 'number' ? p.ii : '', p.ipi === 'NT' ? 'NT' : (typeof p.ipi === 'number' ? p.ipi : ''),
         pc ? pc.pis : '', pc ? pc.cofins : '',
         r ? r.rotulo : 'sem NCM', r ? r.orgaos.join(' / ') : '',
@@ -1690,6 +1730,10 @@
     $('#cam').onchange = (e) => { receberArquivos(e.target.files); e.target.value = ''; };
     $('#gal').onchange = (e) => { receberArquivos(e.target.files); e.target.value = ''; };
     $('#btn-salvar').onclick = salvarProduto;
+    $$('#f-nota button').forEach(b => b.onclick = () => {
+      notaCaptura = +b.dataset.nota;
+      $$('#f-nota button').forEach(x => x.classList.toggle('on', +x.dataset.nota === notaCaptura));
+    });
     $$('#f-cond button').forEach(b => b.onclick = () => {
       $$('#f-cond button').forEach(x => x.classList.remove('on'));
       b.classList.add('on'); condAtual = b.dataset.v;
