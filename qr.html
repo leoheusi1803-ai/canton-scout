@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080d18">
+<title>Canton Scout — QR para instalar</title>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+<style>
+  body{padding:34px 16px 48px}
+  .wrap{max-width:560px;margin:0 auto;text-align:center}
+  h1{font-size:25px;margin:0 0 8px;letter-spacing:-.03em}
+  .sub{color:var(--dim);font-size:14px;line-height:1.6;margin:0 0 26px}
+  .cartao{background:linear-gradient(180deg,var(--card),#121c2e);border:1px solid var(--line);
+    border-radius:var(--r);padding:22px;margin:0 0 14px}
+  .cartao b{display:block;font-size:16px;margin:0 0 4px}
+  .cartao .para{color:var(--dim2);font-size:12.5px;line-height:1.5;margin:0 0 16px}
+  /* fundo branco atrás do QR: leitor de celular não lê QR escuro */
+  .codigo{background:#fff;padding:14px;border-radius:12px;display:inline-block;line-height:0}
+  .codigo img{display:block;width:232px;height:232px}
+  .codigo canvas{display:none}
+  .link{display:block;margin:14px 0 0;font-size:11.5px;color:var(--dim2);word-break:break-all}
+  .copiar{margin:12px 0 0;background:var(--bg2);border:1px solid var(--line);color:var(--tx);
+    font:inherit;font-weight:650;font-size:13.5px;padding:10px 18px;border-radius:11px;cursor:pointer}
+  .nota{color:var(--dim2);font-size:12px;line-height:1.7;margin:24px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mande este QR</h1>
+  <p class="sub">Abra esta página no notebook e deixe a tela à mostra — quem vai usar o app
+  aponta a câmera do celular e cai direto nas instruções de instalação.</p>
+
+  <div class="cartao">
+    <b>Instalar o aplicativo</b>
+    <p class="para">É este que você manda para a sua irmã e para a Maria.<br>
+    Abre a página “comece aqui”, com o passo a passo do iPhone e do Android.</p>
+    <div class="codigo" id="q1"></div>
+    <span class="link" id="l1"></span>
+    <button class="copiar" data-alvo="l1">Copiar o link</button>
+  </div>
+
+  <div class="cartao">
+    <b>Abrir o app direto</b>
+    <p class="para">Para quem já instalou e só quer o endereço.</p>
+    <div class="codigo" id="q2"></div>
+    <span class="link" id="l2"></span>
+    <button class="copiar" data-alvo="l2">Copiar o link</button>
+  </div>
+
+  <p class="nota">O QR é gerado aqui dentro, sem internet.<br>
+  Se preferir mandar como imagem: toque e segure o código no celular, ou use a tecla
+  Print Screen no notebook.</p>
+</div>
+
+<script src="js/qrcode.min.js"></script>
+<script>
+  /* a URL se resolve sozinha: serve em localhost, no GitHub Pages ou em qualquer subpasta */
+  const base = location.href.replace(/\/qr\.html.*$/, '/').replace(/\/[^/]*$/, '/');
+  const alvos = [
+    { q: 'q1', l: 'l1', url: base + 'comecar.html' },
+    { q: 'q2', l: 'l2', url: base }
+  ];
+  for (const a of alvos) {
+    document.getElementById(a.l).textContent = a.url;
+    const cx = document.getElementById(a.q);
+    new QRCode(cx, {
+      text: a.url, width: 232, height: 232,
+      colorDark: '#0b1220', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    /* a lib desenha num canvas e deixa um <img> vazio ao lado. Passo o
+       desenho para o <img>: assim vira imagem de verdade, que dá para
+       salvar com toque longo no celular. */
+    const cv = cx.querySelector('canvas'), im = cx.querySelector('img');
+    if (cv && im) { im.src = cv.toDataURL('image/png'); im.alt = a.url; }
+  }
+  for (const b of document.querySelectorAll('.copiar')) {
+    b.onclick = async () => {
+      const txt = document.getElementById(b.dataset.alvo).textContent;
+      try { await navigator.clipboard.writeText(txt); b.textContent = 'Copiado'; }
+      catch { b.textContent = 'Copie da linha acima'; }
+      setTimeout(() => b.textContent = 'Copiar o link', 1800);
+    };
+  }
+</script>
+</body>
+</html>
