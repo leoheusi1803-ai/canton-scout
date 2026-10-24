@@ -9,7 +9,7 @@
    A sugestão sempre passa por confirmação de quem está no estande.
    ============================================================ */
 const VISAO = (() => {
-  let modelo = null, rotulos = null, mapa = null;
+  let modelo = null, rotulos = null, mapa = null, busca = {};
   let carregando = null;
 
   const TAM = 224;              // entrada do MobileNet V2
@@ -48,7 +48,7 @@ const VISAO = (() => {
         fetch('data/visao.json').then(r => r.json())
       ]))
       .then(([m, r, v]) => {
-        modelo = m; rotulos = r; mapa = v.mapa;
+        modelo = m; rotulos = r; mapa = v.mapa; busca = v.busca || {};
         // aquece: a primeira inferência é sempre a mais lenta
         const zero = tf.zeros([1, TAM, TAM, 3]);
         const saida = modelo.predict(zero);
@@ -188,10 +188,18 @@ const VISAO = (() => {
       // abaixo do limiar: devolve separado e rotulado, para a tela avisar
       // que é palpite fraco em vez de simplesmente não dizer nada
       const fracas = forte ? [] : prods.filter(s => s.p >= MIN_ALT).slice(0, quantos);
+      /* o modelo tem certeza do objeto, mas ele não está no dicionário de
+         produtos: a "xícara de café" vista como "espresso" a 89% caía em
+         "Não reconheci". Para os objetos com tradução conferida contra a
+         tabela, devolve o termo em português para buscar na NCM.        */
+      const topoBruto = melhor && melhor.ordenado[0];
+      const termo = !forte && topoBruto && topoBruto.p >= MIN_TOPO && busca[topoBruto.rot]
+        ? { rot: topoBruto.rot, p: topoBruto.p, q: busca[topoBruto.rot] } : null;
 
       return {
         sugestoes,
         fracas,
+        termo,
         bruto: (melhor ? melhor.ordenado : []).slice(0, 3).map(x => ({ rot: x.rot, p: x.p })),
         diag: {
           ms: Date.now() - t0,

@@ -2,7 +2,7 @@
    sw.js — service worker. É isto que faz o app abrir sem
    internet nenhuma, dentro do pavilhão da feira.
    ============================================================ */
-const CACHE = 'canton-scout-v18';
+const CACHE = 'canton-scout-v19';
 
 /* tudo que precisa estar no aparelho antes de embarcar */
 const ESSENCIAL = [
@@ -37,12 +37,23 @@ const ESSENCIAL = [
   'modelo/group1-shard4of4'
 ];
 
+/* A atualização chega com a pessoa já na China, por VPN ou roaming fraco.
+   Se um arquivo não baixar, reaproveita a cópia da versão anterior — senão
+   o activate apagaria o cache velho e o app perderia, por exemplo, o
+   modelo da foto, sem ninguém perceber até ficar offline.
+   'no-cache' revalida: o que não mudou volta como 304, sem baixar de novo. */
+function guardar(c, u) {
+  return fetch(new Request(u, { cache: 'no-cache' }))
+    .then(res => { if (!res.ok) throw new Error(res.status); return c.put(u, res); })
+    .catch(() => caches.match(u, { ignoreSearch: true })
+      .then(velho => velho ? c.put(u, velho) : null))
+    .catch(() => null);
+}
+
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE)
-      // addAll falha inteiro se um item falhar: baixa um por um e segue
-      .then(c => Promise.all(ESSENCIAL.map(u =>
-        c.add(new Request(u, { cache: 'reload' })).catch(() => null))))
+      .then(c => Promise.all(ESSENCIAL.map(u => guardar(c, u))))
       .then(() => self.skipWaiting())
   );
 });
