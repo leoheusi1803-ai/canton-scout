@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v23 · 24/10/2026 · estande';
+  const VERSAO = 'v24 · 24/10/2026 · NCM pela IA';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -158,7 +158,10 @@
       renderThumbs();
       toast(novos.length + (novos.length > 1 ? ' arquivos adicionados' : ' arquivo adicionado'));
       const foto = novos.find(m => (m.tipo || '').startsWith('image'));
-      if (foto) reconhecer(foto.blob);
+      if (foto) {
+        reconhecer(foto.blob);
+        if (ncmIaFeita !== capturaAtual) classificarCaptura(foto.blob);
+      }
       else toast('Vídeo guardado · o reconhecimento só lê foto');
     });
   }
@@ -180,6 +183,7 @@
     })
       .then(() => VISAO.classificar(blob, 3))
       .then(({ sugestoes, fracas, termo, bruto, diag }) => {
+        if (iaJaClassificou()) { el.innerHTML = ''; return; }
         // o diagnóstico fica sempre disponível: sem ele é impossível saber
         // POR QUE uma foto óbvia não foi reconhecida
         const detalhe = `<details style="margin-top:10px">
@@ -249,6 +253,7 @@
         });
       })
       .catch(e => {
+        if (iaJaClassificou()) { el.innerHTML = ''; return; }
         el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">
           Reconhecimento por foto indisponível (${esc(e.message)}).
           Use a aba <b>NCM</b> no modo Guiado.</p></div>`;
@@ -572,6 +577,155 @@
     });
   }
 
+  /* ---------------- NCM pela IA ----------------
+     O reconhecimento no aparelho conhece mil objetos genéricos e o
+     dicionário do modo Guiado é de utilidades: banheira, vaso sanitário,
+     sauna, casa pré-fabricada e painel de PVC — o que esta feira vende —
+     saíam todos "Não reconheci". Com internet, a IA olha a foto e diz a
+     posição (4 dígitos); o item final sai da tabela oficial que está no
+     aparelho, escolhido pelos textos dela. Inventando de cabeça, a IA erra
+     o fim do código: pôs um toalheiro em 8516.79.10, que é "Panelas".
+     Sugere, nunca decide: quem toca escolhe.                          */
+  let ncmCaptura = null;        // NCM escolhida na captura: vai junto ao salvar
+  let ncmIaFeita = -1;          // captura em que a classificação automática já rodou
+  let ncmIaMostrada = -1;       // e em que ela já respondeu
+
+  /* os dois últimos níveis da hierarquia, cortados pelo começo: é no fim
+     do texto da posição que está o material ("…de cerâmica", "…de plástico") */
+  const niveisDoItem = (it) => (it.path || '').split(' > ').filter(Boolean).slice(-2)
+    .map(t => t.length > 90 ? '…' + t.slice(-90).replace(/^\S*\s/, '') : t);
+  // com o texto do item: é o que separa os itens de uma posição
+  const textoDoItem = (it) => niveisDoItem(it).concat(it.desc).join(' > ');
+
+  /* um grupo por posição sugerida, com todos os itens oficiais dela.
+     Posição que não existe na tabela é palpite descartado. */
+  function gruposDaIa(candidatos) {
+    const grupos = [];
+    (candidatos || []).forEach(c => {
+      const pos = String(c.ncm || '').replace(/\D/g, '').slice(0, 4);
+      if (pos.length < 4 || grupos.some(g => g.pos === pos)) return;
+      const itens = BASE.itensPorPrefixo(pos);
+      if (itens.length) grupos.push({ pos, itens, ncm: String(c.ncm), motivo: c.motivo || '', confirmar: c.confirmar || '' });
+    });
+    return grupos;
+  }
+
+  /* devolve { produto, descricao, observacao, opcoes: [{ item, motivo, confirmar }] } */
+  function classificarComIa(imagem, texto) {
+    const viagem = SYNC.codigo();
+    return IA.classificarNcm(imagem, texto, viagem).then(r => {
+      const grupos = gruposDaIa(r.candidatos);
+      const varios = grupos.filter(g => g.itens.length > 1);
+      const etapa2 = !varios.length ? Promise.resolve([])
+        : IA.escolherItemNcm({
+          produto: r.produto, descricao: r.descricao, texto,
+          grupos: varios.map(g => ({ sub: g.pos, motivo: g.motivo,
+            itens: g.itens.slice(0, 80).map(it => ({ ncm: it.ncm, desc: textoDoItem(it) })) }))
+        }, viagem).then(e => e.escolhas || []).catch(() => null);
+      return etapa2.then(escolhas => {
+        const opcoes = [];
+        grupos.forEach(g => {
+          let item = null, motivo = g.motivo;
+          if (g.itens.length === 1) item = g.itens[0];
+          else if (escolhas) {
+            const e = escolhas.find(x => g.itens.some(it => it.ncm === x.ncm));
+            if (e) { item = g.itens.find(it => it.ncm === e.ncm); motivo = e.motivo || motivo; }
+          } else {
+            // a 2ª etapa não respondeu: o código da 1ª só vale se existir na tabela
+            item = BASE.item(g.ncm.replace(/\D/g, '').slice(0, 8));
+          }
+          if (item && !opcoes.some(o => o.item.ncm === item.ncm)) opcoes.push({ item, motivo, confirmar: g.confirmar });
+        });
+        return { produto: r.produto || '', descricao: r.descricao || '', observacao: r.observacao || '', opcoes };
+      });
+    });
+  }
+
+  function htmlOpcoesNcm(res, dado, cond) {
+    return `<div class="opcoes">` + res.opcoes.map((o, i) => {
+      const it = o.item;
+      const r = BASE.risco(it.ncm, { cond, texto: res.produto + ' ' + res.descricao });
+      return `<button type="button" data-${dado}="${i}"><span><span class="code">${fmtNcm(it.ncm)}</span> · ${esc(it.desc)}
+          <small>${esc(niveisDoItem(it).join(' > '))}</small>
+          ${o.motivo || o.confirmar ? `<small>${esc(o.motivo)}${o.confirmar ? ' · <b>confirme:</b> ' + esc(o.confirmar) : ''}</small>` : ''}
+          <small><span class="tag tag-ac">II ${typeof it.ii === 'number' ? it.ii + '%' : '?'}</span>
+            <span class="tag">IPI ${it.ipi === 'NT' ? 'NT' : (typeof it.ipi === 'number' ? it.ipi + '%' : '?')}</span>
+            <span class="tag ${NIVEL_TAG[r.nivel]}">${esc(r.rotulo)}</span></small></span>
+        <span class="seta">›</span></button>`;
+    }).join('') + `</div>`;
+  }
+
+  const anotacoes = (pares) => pares.filter(([, v]) => (v || '').trim())
+    .map(([k, v]) => k + ': ' + v.trim()).join('. ');
+
+  function pintarNcmCaptura(res) {
+    const el = $('#ncm-ia');
+    if (ncmCaptura) {
+      el.innerHTML = `<div class="card tight"><b>🤖 NCM ${fmtNcm(ncmCaptura.ncm)} escolhida</b>
+        <p class="hint" style="margin:4px 0 0">${esc(ncmCaptura.ncmDesc)} — vai junto quando você salvar.
+        <button type="button" class="link" id="ncm-trocar">trocar</button></p></div>`;
+      $('#ncm-trocar').onclick = () => { ncmCaptura = null; pintarNcmCaptura(res); };
+      return;
+    }
+    el.innerHTML = `<div class="card">
+      <h3 style="margin-bottom:4px">🤖 ${res.opcoes.length ? 'NCM sugerida pela IA' : 'A IA não achou a NCM'}</h3>
+      <p class="hint" style="margin:0 0 10px">${esc([res.produto, res.observacao].filter(Boolean).join(' · ')
+        || 'A foto não mostrou o produto com clareza.')}</p>
+      ${res.opcoes.length ? htmlOpcoesNcm(res, 'ncm-op', condAtual) + `<p class="hint">Toque na certa: ela vai junto
+        quando você salvar. Confira o texto oficial e o que pedir ao fornecedor.</p>` : ''}
+      <button type="button" class="ghost" id="ncm-de-novo">🤖 Classificar de novo com o que escrevi</button></div>`;
+    el.querySelectorAll('[data-ncm-op]').forEach(b => b.onclick = () => {
+      const it = res.opcoes[+b.dataset.ncmOp].item;
+      ncmCaptura = { ncm: it.ncm, ncmDesc: it.desc, ii: it.ii, ipi: it.ipi };
+      pintarNcmCaptura(res);
+      toast('NCM ' + fmtNcm(it.ncm) + ' vai junto ao salvar');
+    });
+    $('#ncm-de-novo').onclick = deNovo;
+  }
+  // a foto desta captura (a que a pessoa tirou × some daqui), ou só o texto
+  const deNovo = () => classificarCaptura((pendentes.find(fotoDoProduto) || {}).blob);
+
+  function classificarCaptura(foto) {
+    const el = $('#ncm-ia');
+    if (!SYNC.ativo() || !navigator.onLine) {
+      el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">🤖 NCM pela IA: ${!SYNC.ativo()
+        ? 'preencha o <b>código da viagem</b> em Config.'
+        : 'sem internet agora. Depois de salvar, abra o produto e toque em <b>Classificar NCM com IA</b>.'}</p></div>`;
+      return;
+    }
+    const minha = capturaAtual;
+    ncmIaFeita = minha;
+    const texto = anotacoes([['Produto', $('#f-nome').value], ['Detalhes', $('#f-desc').value], ['Observações', $('#f-obs').value]]);
+    el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">🤖 a IA está classificando a NCM…</p></div>`;
+    (foto ? imagemReduzida(foto, 800, 0.7) : Promise.resolve(null))
+      .then(img => {
+        if (!img && !texto) throw new Error('tire a foto ou escreva o nome do produto');
+        return classificarComIa(img, texto);
+      })
+      .then(res => {
+        if (minha !== capturaAtual) return;
+        ncmIaMostrada = minha;
+        // o nome e os detalhes que a IA viu poupam digitação; o que já foi escrito fica
+        if (res.produto && !$('#f-nome').value.trim()) $('#f-nome').value = res.produto;
+        if (res.descricao && !$('#f-desc').value.trim()) $('#f-desc').value = res.descricao;
+        if (res.opcoes.length) $('#sugestao').innerHTML = '';   // o palpite do aparelho sai: a IA viu melhor
+        ncmCaptura = null;
+        pintarNcmCaptura(res);
+        // quem está digitando não perde o lugar
+        if (!/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || ''))
+          try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { }
+      })
+      .catch(e => {
+        if (minha !== capturaAtual) return;
+        el.innerHTML = `<div class="card tight"><b>🤖 Não consegui classificar</b>
+          <p class="hint" style="margin:4px 0 10px">${esc(e.message)}. Dá para tentar de novo agora ou depois, no produto.</p>
+          <button type="button" class="ghost" id="ncm-de-novo">🤖 Classificar de novo com o que escrevi</button></div>`;
+        $('#ncm-de-novo').onclick = deNovo;
+      });
+  }
+  // a IA já respondeu com opções nesta captura: o palpite do aparelho não volta por cima
+  const iaJaClassificou = () => ncmIaMostrada === capturaAtual && !!$('#ncm-ia [data-ncm-op], #ncm-ia #ncm-trocar');
+
   /* Versão nova baixada no meio da feira: recarregar com foto ou preço
      ainda não salvos jogaria o cadastro fora. Espera o formulário ficar
      vazio, depois de salvar. Nunca ao ir para segundo plano: abrir a
@@ -600,7 +754,9 @@
     document.querySelectorAll('#f-nota button').forEach(b => b.classList.remove('on'));
     document.querySelector('#sugestao').innerHTML = '';
     document.querySelector('#ia-res').innerHTML = '';
+    document.querySelector('#ncm-ia').innerHTML = '';
     document.querySelector('#cap-erro').innerHTML = '';
+    ncmCaptura = null;
     capturaAtual++;
     // fornecedor/estande/contato ficam: normalmente são vários produtos do mesmo estande
     recarregarSePuder();
@@ -645,6 +801,7 @@
       ncm: null, ncmDesc: '', ii: null, ipi: null,
       criado: Date.now(), atualizado: Date.now()
     };
+    if (ncmCaptura) Object.assign(p, ncmCaptura, { ncmIa: true });
     const midias = pendentes.map(m => ({ id: m.id, produtoId: id, blob: m.blob, tipo: m.tipo, nome: m.nome,
       cartao: !!m.cartao, audio: !!m.audio, placa: !!m.placa }));
     miniaturaDe(midias)
@@ -808,6 +965,7 @@
     const tags = [];
     if (p.ncm) {
       tags.push(`<span class="tag tag-ac code">${p.ncm}</span>`);
+      if (p.ncmIa) tags.push('<span class="tag">🤖 IA</span>');
       tags.push(`<span class="tag ${NIVEL_TAG[r.nivel]}">${esc(r.rotulo)}</span>`);
       r.orgaos.slice(0, 3).forEach(o => tags.push(`<span class="tag">${esc(o)}</span>`));
     } else if (p.paraRevisar) {
@@ -913,7 +1071,10 @@
         </div>
 
         ${r ? blocoRisco(r) : '<p class="warn">Sem NCM atribuída. Classifique para ver barreiras e custo.</p>'}
+        ${r && p.ncmIa ? '<p class="hint">🤖 NCM sugerida pela IA e escolhida no app — confira o texto oficial antes de fechar o pedido.</p>' : ''}
+        <div id="m-ncm-ia-res"></div>
         <div style="margin-top:14px">
+          <button class="ghost" id="m-ncm-ia">🤖 ${p.ncm ? 'Conferir a NCM com a IA' : 'Classificar NCM com IA'}</button>
           <button class="ghost" id="m-classificar">${p.ncm ? 'Trocar a NCM' : 'Classificar NCM'}</button>
           ${p.ncm ? '<button class="ghost" id="m-custo">Ver previsão de custo</button>' : ''}
           <button class="ghost danger" id="m-apagar">Apagar produto</button>
@@ -952,6 +1113,36 @@
           if (c.forn && !mesmaEmpresa(c.forn, p.forn) && !(p.obs || '').includes(c.forn)) p.obs = juntar(p.obs, 'Placa: ' + c.forn);
           return releu('Estande ' + c.estande);
         }).catch(e => toast('Não li a placa: ' + e.message));
+      };
+      /* NCM pela IA: com a foto do aparelho ou, no produto de outro
+         celular, com a miniatura que veio na sincronização */
+      $('#m-ncm-ia').onclick = () => {
+        if (!podeLer()) return;
+        const alvo = $('#m-ncm-ia-res');
+        alvo.innerHTML = '<p class="hint">🤖 a IA está classificando a NCM…</p>';
+        const foto = ms.find(fotoDoProduto);
+        const texto = anotacoes([['Produto', p.nome], ['Detalhes', p.desc], ['Observações', p.obs]]);
+        (foto ? imagemReduzida(foto.blob, 800, 0.7) : Promise.resolve(p.miniatura || null))
+          .then(img => classificarComIa(img, texto))
+          .then(res => {
+            if (!res.opcoes.length) {
+              alvo.innerHTML = `<p class="hint">🤖 A IA não achou a NCM${res.observacao ? ': ' + esc(res.observacao) : ''}.
+                Escreva os detalhes numa anotação ou use <b>Classificar NCM</b>.</p>`;
+              return;
+            }
+            alvo.innerHTML = `<h3 style="margin:14px 0 8px">🤖 NCM sugerida pela IA</h3>
+              <p class="hint" style="margin:0 0 10px">${esc([res.produto, res.observacao].filter(Boolean).join(' · '))}</p>
+              ${htmlOpcoesNcm(res, 'm-ncm-op', p.cond)}
+              <p class="hint">Toque na certa para gravar no produto. Confira o texto oficial e o que pedir ao fornecedor.</p>`;
+            alvo.querySelectorAll('[data-m-ncm-op]').forEach(b => b.onclick = () => {
+              const it = res.opcoes[+b.dataset.mNcmOp].item;
+              Object.assign(p, { ncm: it.ncm, ncmDesc: it.desc, ii: it.ii, ipi: it.ipi, ncmIa: true });
+              if (p.paraRevisar) p.paraRevisar = false;
+              releu('NCM ' + fmtNcm(it.ncm) + ' gravada');
+            });
+            try { alvo.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { }
+          })
+          .catch(e => { alvo.innerHTML = `<p class="hint">🤖 Não consegui classificar: ${esc(e.message)}.</p>`; });
       };
       if ($('#m-ler-audio')) $('#m-ler-audio').onclick = () => {
         if (!podeLer()) return;
@@ -1712,6 +1903,7 @@
     if (guia.prod && guia.prod.cat && !p.cat) p.cat = guia.prod.cat;
     if (guia.prod) p.nomeDic = guia.prod.n;   // chave da faixa de preço no Brasil
     if (p.paraRevisar) p.paraRevisar = false;
+    p.ncmIa = false;
     p.atualizado = Date.now();
     DB.salvarProduto(p).then(() => {
       alvoProduto = null; fecharModal();
@@ -2201,7 +2393,7 @@
       'PIS %', 'COFINS %', 'Risco', 'Órgãos anuentes',
       'Antidumping', 'Fornecedor', 'Estande', 'Fase', 'Contato', 'Moeda', 'Preço FOB', 'MOQ',
       'Qtd', 'Peso kg', 'CBM', 'Custo/un BRL', 'Custo efetivo/un BRL', 'Multiplicador FOB',
-      'Venda Brasil min', 'Venda Brasil max', 'Observações', 'Notas'];
+      'Venda Brasil min', 'Venda Brasil max', 'Observações', 'Notas', 'NCM sugerida pela IA'];
     const linhas = produtos.map(p => {
       const r = p.ncm ? BASE.risco(p.ncm, { cond: p.cond, texto: p.nome + ' ' + p.desc }) : null;
       const c = (p.ncm && typeof p.ii === 'number') ? CUSTOS.calcular(p, cfg) : null;
@@ -2216,7 +2408,8 @@
         c ? c.unit.toFixed(2) : '', c ? c.unitLiquido.toFixed(2) : '', c ? c.multiplo.toFixed(2) : '',
         ref ? ref.min : '', ref ? ref.max : '',
         p.obs,
-        (p.notas || []).map(n => dataCurta(n.t) + ': ' + n.txt).join(' | ')];
+        (p.notas || []).map(n => dataCurta(n.t) + ': ' + n.txt).join(' | '),
+        p.ncm && p.ncmIa ? 'SIM' : ''];
     });
     const cel = (v) => { const s = String(v == null ? '' : v); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const csv = '﻿' + [cab, ...linhas].map(l => l.map(cel).join(';')).join('\r\n');

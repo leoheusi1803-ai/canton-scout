@@ -58,6 +58,10 @@ inglês sobre os 10.516 códigos, com os candidatos ranqueados.
   empresa e preenche "Nº do estande" e "Fabricante". Placa de outro estande
   apaga o contato que sobrou do fornecedor anterior (um toque desfaz). A foto
   fica no produto; sem rede, dá para ler depois pelo botão "Ler placa".
+  **NCM pela IA**: com internet, a foto do produto já volta com até três NCM
+  sugeridas (texto oficial, II, IPI e risco); a escolhida vai junto ao salvar.
+  No produto salvo, o botão "Classificar NCM com IA" faz o mesmo — inclusive
+  nos produtos dos outros celulares, pela miniatura.
 - **Produtos** — lista com o selo de risco e o custo por peça já calculado.
   Ordena por pior risco ou menor custo. Exporta backup (.json, com as fotos)
   e planilha (.csv, abre no Excel).
@@ -86,6 +90,26 @@ para o celular nem para este repositório. Cartão e placa do estande: GPT-4o co
 Áudio: Whisper transcreve e o GPT-4o mini separa preço, MOQ e detalhes. O fluxo só
 atende quem manda o código da viagem certo; **se trocarem o código, troque
 também no nó "Conferir e Preparar"** do fluxo.
+
+## Classificação da NCM pela IA
+
+O reconhecimento no aparelho (MobileNet) conhece mil objetos genéricos e o
+modo Guiado tem um dicionário de utilidades; banheira, vaso sanitário, sauna,
+casa pré-fabricada ou painel de PVC caíam em "Não reconheci". Com internet, o
+app chama o fluxo **Canton Scout - Classificar NCM** no n8n
+(`/webhook/canton-scout-ncm`), em duas etapas:
+
+1. O GPT-4o olha a foto e o que foi anotado e propõe até três posições (4
+   dígitos), com o motivo e o que confirmar com o fornecedor (o material,
+   quase sempre).
+2. O app pega na tabela oficial que está no aparelho **todos os itens** de
+   cada posição e a IA escolhe entre esses textos. Assim o código final sempre
+   existe e bate com a descrição — de cabeça, a IA errava o fim do código
+   (8516.79.10 é "Panelas", não toalheiro elétrico).
+
+É sugestão: quem toca escolhe, e o produto fica marcado com "🤖 IA" na lista e
+na planilha até alguém atribuir a NCM pelo modo Guiado ou pela busca. O fluxo
+confere o mesmo código da viagem do fluxo do cartão.
 
 ## Antes de embarcar — faça nesta ordem
 
