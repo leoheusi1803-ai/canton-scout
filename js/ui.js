@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v24 · 24/10/2026 · NCM pela IA';
+  const VERSAO = 'v25 · 24/10/2026 · unidade e MOQ';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -145,6 +145,34 @@
   function blobUrl(id, blob) {
     if (!urlCache.has(id)) urlCache.set(id, URL.createObjectURL(blob));
     return urlCache.get(id);
+  }
+
+  /* ---------------- unidade de venda ----------------
+     Pedra e painel se vendem por m², louça por peça ou conjunto, e o
+     mínimo às vezes é um contêiner inteiro. Preço, quantidade, peso e CBM
+     são por unidade de venda; o MOQ tem a dele. Produto sem unidade
+     (salvo antes da v25) é por peça, como sempre foi.             */
+  // a do produto ou, produto novo, a que está escolhida na captura
+  const unDe = (p) => CUSTOS.unidade(p ? (p.un || 'pc') : (($('#f-un') || {}).value || 'pc'));
+  const fmtQtd = (n) => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+  // "1.000 peças", "500 m²", "1 contêiner 40'"
+  const qtdUn = (n, u) => fmtQtd(n) + ' ' + (u.id === 'pc' ? (n > 1 ? 'peças' : 'peça') : u.curto);
+  const precoTxt = (p) => `${p.moeda} ${n2(p.preco)}${p.un ? '/' + CUSTOS.unidade(p.un).curto : ''}`;
+  const moqTxt = (p) => p.moq ? qtdUn(p.moq, CUSTOS.unidade(p.moqUn || p.un || 'pc')) : '—';
+  const opcoesUn = (lista) => lista.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
+  let moqUnTocado = false;     // a pessoa escolheu a unidade do MOQ: a do preço não passa por cima
+
+  function pintarUnidades() {
+    const u = unDe(null);
+    $$('#v-capturar .un-txt').forEach(el => {
+      el.textContent = el.closest('label').htmlFor === 'f-qtd' ? '(' + (u.id === 'pc' ? 'peças' : u.curto) + ')' : u.nome;
+    });
+  }
+  function escolherUnidade(un, moqUn) {
+    if (un) $('#f-un').value = un;
+    if (moqUn) { $('#f-moq-un').value = moqUn; moqUnTocado = true; }
+    else if (un && !moqUnTocado) $('#f-moq-un').value = un;
+    pintarUnidades();
   }
 
   /* ---------------- captura ---------------- */
@@ -339,14 +367,20 @@
       obs: extra ? 'Cartão: ' + extra : '' };
   }
 
+  // m² e tonelada têm decimal: o fluxo devolve número, e texto vem sem separador de milhar
+  const quantidade = (v) => typeof v === 'number' ? (isFinite(v) && v > 0 ? v : 0) : numero(v);
+  const unidadeValida = (v, lista) => lista.some(u => u.id === v) ? v : '';
+
   function camposDoAudio(d) {
     return {
       nome: (d.nome || '').trim(),
       desc: (d.descricao || '').trim(),
       preco: numero(d.preco),
       moeda: moedaDe(d.moeda),
-      moq: inteiro(d.moq),
-      qtd: inteiro(d.quantidade),
+      un: unidadeValida(d.unidade, CUSTOS.UNIDADES),
+      moq: quantidade(d.moq),
+      moqUn: unidadeValida(d.moq_unidade, CUSTOS.UNIDADES_MOQ),
+      qtd: quantidade(d.quantidade),
       peso: numero(d.peso_kg),
       cbm: numero(d.cbm),
       obs: (d.observacoes || '').trim()
@@ -475,6 +509,7 @@
       if (c.desc) { $('#f-desc').value = juntar($('#f-desc').value, c.desc); feito.push('detalhes'); }
       if (c.preco) { $('#f-preco').value = c.preco; feito.push('preço'); }
       if (c.moeda) $('#f-moeda').value = c.moeda;
+      if (c.un || c.moqUn) { escolherUnidade(c.un, c.moqUn); feito.push('unidade'); }
       if (c.moq) { $('#f-moq').value = c.moq; feito.push('MOQ'); }
       if (c.qtd) { $('#f-qtd').value = c.qtd; feito.push('quantidade'); }
       if (c.peso) { $('#f-peso').value = c.peso; feito.push('peso'); }
@@ -749,6 +784,8 @@
 
   function limparForm() {
     ['f-nome', 'f-desc', 'f-preco', 'f-moq', 'f-qtd', 'f-peso', 'f-cbm', 'f-obs'].forEach(id => $('#' + id).value = '');
+    // a unidade é do produto, como o preço: volta a peça
+    $('#f-un').value = 'pc'; $('#f-moq-un').value = 'pc'; moqUnTocado = false; pintarUnidades();
     pendentes = []; renderThumbs();
     notaCaptura = 0;
     document.querySelectorAll('#f-nota button').forEach(b => b.classList.remove('on'));
@@ -788,8 +825,10 @@
       desc: $('#f-desc').value.trim(),
       preco: parseFloat($('#f-preco').value) || 0,
       moeda: $('#f-moeda').value,
-      moq: parseInt($('#f-moq').value) || 0,
-      qtd: parseInt($('#f-qtd').value) || 0,
+      un: $('#f-un').value,
+      moq: parseFloat($('#f-moq').value) || 0,
+      moqUn: $('#f-moq-un').value,
+      qtd: parseFloat($('#f-qtd').value) || 0,
       peso: parseFloat($('#f-peso').value) || 0,
       cbm: parseFloat($('#f-cbm').value) || 0,
       forn: $('#f-forn').value.trim(),
@@ -980,7 +1019,7 @@
     const nNotas = (p.notas || []).length;
     if (nNotas) tags.push(`<span class="tag">${nNotas} nota${nNotas > 1 ? 's' : ''}</span>`);
     const sub = [p.cat ? icoCat(p.cat) + ' ' + nomeCat(p.cat) : '', p.forn, p.estande && 'estande ' + p.estande,
-      p.preco ? `${p.moeda} ${n2(p.preco)}` : '', p.moq ? `MOQ ${p.moq}` : '']
+      p.preco ? precoTxt(p) : '', p.moq ? 'MOQ ' + moqTxt(p) : '']
       .filter(Boolean).join(' · ');
     return `<div class="it" data-abrir="${p.id}">
       <div class="it-top">
@@ -992,7 +1031,7 @@
         <div style="text-align:right">
           ${p.nota ? `<div class="nota-sel ${p.nota >= 8 ? 'alta' : (p.nota <= 4 ? 'baixa' : '')}">${p.nota}</div>` : ''}
           <span class="fav${p.fav ? ' on' : ''}" data-fav="${p.id}" title="favoritar">${p.fav ? '★' : '☆'}</span>
-          ${cu ? `<div class="sc" style="justify-content:flex-end"><b>${brl(cu)}</b><span>/un</span></div>` : ''}
+          ${cu ? `<div class="sc" style="justify-content:flex-end"><b>${brl(cu)}</b><span>/${p.un ? CUSTOS.unidade(p.un).curto : 'un'}</span></div>` : ''}
         </div>
       </div>
       <div class="it-foot">${tags.join('')}</div>
@@ -1035,9 +1074,9 @@
         </div>` : ''}
         ${p.desc ? `<p style="font-size:13.5px;color:var(--dim)">${esc(p.desc)}</p>` : ''}
         <table class="br" style="margin:10px 0">
-          ${linhaInfo('Preço FOB', p.preco ? `${p.moeda} ${n2(p.preco)}` : '—')}
-          ${linhaInfo('MOQ / quantidade', `${p.moq || '—'} / ${p.qtd || '—'}`)}
-          ${linhaInfo('Peso / CBM unit.', `${p.peso || '—'} kg / ${p.cbm || '—'} m³`)}
+          ${linhaInfo('Preço FOB', p.preco ? precoTxt(p) : '—')}
+          ${linhaInfo('MOQ / quantidade', `${moqTxt(p)} / ${p.qtd ? qtdUn(p.qtd, unDe(p)) : '—'}`)}
+          ${linhaInfo(p.un ? 'Peso / CBM por ' + unDe(p).nome : 'Peso / CBM unit.', `${p.peso || '—'} kg / ${p.cbm || '—'} m³`)}
           ${linhaInfo('Contato', p.contato || '—')}
           ${linhaInfo('Condição', p.cond === 'usado' ? 'usado / recondicionado' : 'novo')}
           ${p.obs ? linhaInfo('Observações', p.obs) : ''}
@@ -1153,6 +1192,8 @@
           if (c.desc && !(p.desc || '').includes(c.desc)) p.desc = juntar(p.desc, c.desc);
           if (c.preco) p.preco = c.preco;
           if (c.moeda) p.moeda = c.moeda;
+          if (c.un) p.un = c.un;
+          if (c.moqUn || (c.un && !p.moqUn)) p.moqUn = c.moqUn || c.un;
           if (c.moq) p.moq = c.moq;
           if (c.qtd) p.qtd = c.qtd;
           if (c.peso) p.peso = c.peso;
@@ -1496,22 +1537,23 @@
        "quanto isso custa nacionalizado?". Preço e quantidade bastam —
        o resto vem da Config. */
     const qc = Object.assign({ preco: 0, moeda: 'USD', qtd: 1000, cbm: 0.002 }, cfg.rapida || {});
+    const unQc = unDe(alvo);
     if (alvo && alvo.preco > 0) { qc.preco = alvo.preco; qc.moeda = alvo.moeda; }
-    if (alvo && (alvo.qtd || alvo.moq)) { qc.qtd = alvo.qtd || alvo.moq; }
+    if (alvo && CUSTOS.qtdDoPedido(alvo)) { qc.qtd = CUSTOS.qtdDoPedido(alvo); }
     if (alvo && alvo.cbm > 0) { qc.cbm = alvo.cbm; }
 
     const custoHtml = `<div class="card" id="qc-card">
       <h3 style="margin-bottom:10px">Quanto fica no Brasil</h3>
       <div class="row">
-        <div class="f"><label for="qc-preco">Preço no estande</label>
+        <div class="f"><label for="qc-preco">Preço no estande, por <span class="un-txt">${esc(unQc.nome)}</span></label>
           <input id="qc-preco" type="number" inputmode="decimal" step="0.01" value="${qc.preco || ''}" placeholder="0,00"></div>
         <div class="f f-sm"><label for="qc-moeda">Moeda</label>
           <select id="qc-moeda"><option${qc.moeda === 'USD' ? ' selected' : ''}>USD</option><option${qc.moeda === 'CNY' ? ' selected' : ''}>CNY</option></select></div>
       </div>
       <div class="row">
-        <div class="f"><label for="qc-qtd">Quantidade</label>
-          <input id="qc-qtd" type="number" inputmode="numeric" value="${qc.qtd}"></div>
-        <div class="f"><label for="qc-cbm">m³ por peça</label>
+        <div class="f"><label for="qc-qtd">Quantidade <span class="un-txt">(${esc(unQc.id === 'pc' ? 'peças' : unQc.curto)})</span></label>
+          <input id="qc-qtd" type="number" inputmode="decimal" step="any" value="${qc.qtd}"></div>
+        <div class="f"><label for="qc-cbm">m³ por <span class="un-txt">${esc(unQc.nome)}</span></label>
           <input id="qc-cbm" type="number" inputmode="decimal" step="0.0001" value="${qc.cbm}"></div>
       </div>
       <p class="hint" style="margin:0 0 10px">Caixa de caneca ≈ 0,002 · caixa de sapato ≈ 0,008 ·
@@ -1554,8 +1596,9 @@
       const p = {
         ncm: ncm, ii: it.ii, ipi: it.ipi, moeda: $('#qc-moeda').value,
         preco: parseFloat($('#qc-preco').value) || 0,
-        qtd: parseInt($('#qc-qtd').value) || 0,
-        cbm: parseFloat($('#qc-cbm').value) || 0
+        qtd: parseFloat($('#qc-qtd').value) || 0,
+        cbm: parseFloat($('#qc-cbm').value) || 0,
+        un: unQc.id
       };
       // sem peso informado, estima pela densidade típica de bem de consumo
       // embalado (~200 kg/m³); no LCL o que manda é o maior entre m³ e tonelada
@@ -1604,19 +1647,19 @@
       }
       saida.innerHTML = `
         <div class="kpi" style="margin-bottom:0">
-          <div><div class="k-l">Custo por peça</div><div class="k-v hi">${brl(c.unit)}</div>
+          <div><div class="k-l">Custo por ${esc(unQc.nome)}</div><div class="k-v hi">${brl(c.unit)}</div>
             <div class="k-s">${incluirFixas ? 'com despesas do embarque' : 'produto + frete + impostos'}</div></div>
-          <div><div class="k-l">Efetivo por peça</div><div class="k-v">${brl(c.unitLiquido)}</div>
+          <div><div class="k-l">Efetivo por ${esc(unQc.nome)}</div><div class="k-v">${brl(c.unitLiquido)}</div>
             <div class="k-s">${c.aproveita ? 'descontando créditos' : 'Simples: sem crédito'}</div></div>
           <div><div class="k-l">Multiplicador</div><div class="k-v">${c.multiplo.toFixed(2)}×</div>
             <div class="k-s">sobre o preço do estande</div></div>
           <div><div class="k-l">Total do lote</div><div class="k-v" style="font-size:17px">${brl(c.total)}</div>
-            <div class="k-s">${c.qtd.toLocaleString('pt-BR')} peça${c.qtd > 1 ? 's' : ''}</div></div>
+            <div class="k-s">${qtdUn(c.qtd, unQc)}</div></div>
         </div>
         ${refHtml}
         <p class="hint">Inclui II, IPI, PIS, COFINS, ICMS, AFRMM e o frete internacional.
         ${incluirFixas
-          ? `Inclui também ${brl(cfg.despesasBrl + cfg.siscomexBrl)} de despesas do embarque, rateadas por ${c.qtd.toLocaleString('pt-BR')} peça${c.qtd > 1 ? 's' : ''}.`
+          ? `Inclui também ${brl(cfg.despesasBrl + cfg.siscomexBrl)} de despesas do embarque, rateadas por ${qtdUn(c.qtd, unQc)}.`
           : 'Não inclui despachante, THC, armazenagem nem Siscomex — essas são do embarque inteiro, que leva vários produtos, e não deste item sozinho.'}
         Antidumping, quando existe, entra por fora.</p>`;
     };
@@ -1692,17 +1735,21 @@
           <select id="s-fase"><option value="2">Fase 2</option><option value="3"${ult.fase === '3' ? ' selected' : ''}>Fase 3</option><option value="1"${ult.fase === '1' ? ' selected' : ''}>Fase 1</option></select></div>
       </div>
 
-      <div class="row">
-        <div class="f"><label for="s-preco">Preço unit.</label>
+      <div class="row row3">
+        <div class="f"><label for="s-preco">Preço FOB</label>
           <input id="s-preco" type="number" inputmode="decimal" step="0.01" value="${qcP ? qcP.value : ''}"></div>
-        <div class="f f-sm"><label for="s-moeda">Moeda</label>
+        <div class="f"><label for="s-moeda">Moeda</label>
           <select id="s-moeda"><option>USD</option><option${qcM && qcM.value === 'CNY' ? ' selected' : ''}>CNY</option></select></div>
+        <div class="f"><label for="s-un">Por</label>
+          <select id="s-un">${opcoesUn(CUSTOS.UNIDADES)}</select></div>
       </div>
-      <div class="row">
+      <div class="row row3 moq">
+        <div class="f"><label for="s-moq">MOQ</label>
+          <input id="s-moq" type="number" inputmode="decimal" step="any" value="${esc($('#f-moq').value)}" placeholder="mínimo"></div>
+        <div class="f"><label for="s-moq-un">Unid. do MOQ</label>
+          <select id="s-moq-un">${opcoesUn(CUSTOS.UNIDADES_MOQ)}</select></div>
         <div class="f"><label for="s-qtd">Quantidade</label>
-          <input id="s-qtd" type="number" inputmode="numeric" value="${qcQ ? qcQ.value : ''}"></div>
-        <div class="f"><label for="s-moq">MOQ do fornecedor</label>
-          <input id="s-moq" type="number" inputmode="numeric" placeholder="peças"></div>
+          <input id="s-qtd" type="number" inputmode="decimal" step="any" value="${qcQ ? qcQ.value : ''}"></div>
       </div>
 
       <div class="f"><label for="s-obs">Observações</label>
@@ -1710,6 +1757,13 @@
 
       <div id="s-erro"></div>
       <button class="primary big" id="s-ok">Salvar</button>`);
+
+    // a unidade vem da captura (o áudio pode ter dito "o metro quadrado"); o MOQ acompanha até ser escolhido
+    $('#s-un').value = $('#f-un').value;
+    $('#s-moq-un').value = $('#f-moq-un').value;
+    let moqUnEscolhido = moqUnTocado;
+    $('#s-moq-un').onchange = () => { moqUnEscolhido = true; };
+    $('#s-un').onchange = () => { if (!moqUnEscolhido) $('#s-moq-un').value = $('#s-un').value; };
 
     let notaEscolhida = 0;
     $('#modal-body').querySelectorAll('#s-nota button').forEach(b => b.onclick = () => {
@@ -1744,8 +1798,10 @@
         fase: $('#s-fase').value,
         preco: parseFloat($('#s-preco').value) || 0,
         moeda: $('#s-moeda').value,
-        qtd: parseInt($('#s-qtd').value) || 0,
-        moq: parseInt($('#s-moq').value) || 0,
+        un: $('#s-un').value,
+        qtd: parseFloat($('#s-qtd').value) || 0,
+        moq: parseFloat($('#s-moq').value) || 0,
+        moqUn: $('#s-moq-un').value,
         cbm: qcC ? (parseFloat(qcC.value) || 0) : 0,
         peso: qcC ? (parseFloat(qcC.value) || 0) * 200 : 0,
         obs: $('#s-obs').value.trim(),
@@ -1942,15 +1998,15 @@
     el.innerHTML = `
       <div class="card">
         <div class="row">
-          <div class="f"><label for="cx-preco">Preço unit. no estande</label>
+          <div class="f"><label for="cx-preco">Preço no estande, por <span class="un-txt">${esc(unDe(p).nome)}</span></label>
             <input id="cx-preco" type="number" inputmode="decimal" step="0.01" value="${p.preco || ''}"></div>
           <div class="f f-sm"><label for="cx-moeda">Moeda</label>
             <select id="cx-moeda"><option>USD</option><option${p.moeda === 'CNY' ? ' selected' : ''}>CNY</option></select></div>
         </div>
         <div class="row">
-          <div class="f"><label for="cx-qtd">Quantidade do pedido</label>
-            <input id="cx-qtd" type="number" inputmode="numeric" value="${p.qtd || p.moq || ''}" placeholder="peças"></div>
-          <div class="f"><label for="cx-cbm">m³ por peça</label>
+          <div class="f"><label for="cx-qtd">Quantidade do pedido <span class="un-txt">(${esc(unDe(p).id === 'pc' ? 'peças' : unDe(p).curto)})</span></label>
+            <input id="cx-qtd" type="number" inputmode="decimal" step="any" value="${CUSTOS.qtdDoPedido(p) || ''}" placeholder="${esc(unDe(p).id === 'pc' ? 'peças' : unDe(p).curto)}"></div>
+          <div class="f"><label for="cx-cbm">m³ por <span class="un-txt">${esc(unDe(p).nome)}</span></label>
             <input id="cx-cbm" type="number" inputmode="decimal" step="0.0001" value="${p.cbm || 0.002}"></div>
         </div>
         <label class="chk"><input type="checkbox" id="cx-ratear"${ratear ? ' checked' : ''}>
@@ -1963,7 +2019,7 @@
     const recalc = () => {
       p.preco = parseFloat($('#cx-preco').value) || 0;
       p.moeda = $('#cx-moeda').value;
-      p.qtd = parseInt($('#cx-qtd').value) || 0;
+      p.qtd = parseFloat($('#cx-qtd').value) || 0;
       p.cbm = parseFloat($('#cx-cbm').value) || 0;
       p.peso = p.peso || p.cbm * 200;
       p.atualizado = Date.now();
@@ -1971,15 +2027,16 @@
       const r = $('#cx-ratear').checked;
       cfg.custosRatear = r; DB.setCfg('custosRatear', r);
       const cfgC = r ? cfg : Object.assign({}, cfg, { despesasBrl: 0, siscomexBrl: 0 });
-      const qtdReal = p.qtd || p.moq || 0;
-      const avisoQtd = (r && qtdReal > 0 && qtdReal < 50)
+      const qtdReal = CUSTOS.qtdDoPedido(p);
+      // 50 peças é pouco para ratear o embarque; 50 m² ou 50 t, não necessariamente
+      const avisoQtd = (r && qtdReal > 0 && qtdReal < 50 && unDe(p).id === 'pc')
         ? `<div class="alerta bad" style="margin-bottom:12px"><b>Quantidade muito baixa para ratear</b>
            ${brl(cfg.despesasBrl + cfg.siscomexBrl)} de despesas do embarque divididos por
-           ${qtdReal} peça${qtdReal > 1 ? 's' : ''} distorcem o custo unitário. Coloque a quantidade real
+           ${qtdUn(qtdReal, unDe(p))} distorcem o custo unitário. Coloque a quantidade real
            do pedido, ou desmarque o rateio para ver só o custo do produto.</div>`
         : (qtdReal === 0
           ? `<div class="alerta warn" style="margin-bottom:12px"><b>Sem quantidade</b>
-             A conta está usando 1 peça. Preencha a quantidade do pedido acima.</div>` : '');
+             A conta está usando ${qtdUn(1, unDe(p))}. Preencha a quantidade do pedido acima.</div>` : '');
       $('#cx-saida').innerHTML = avisoQtd + extratoHtml(p, CUSTOS.calcular(p, cfgC));
     };
     ['cx-preco', 'cx-moeda', 'cx-qtd', 'cx-cbm', 'cx-ratear'].forEach(id => {
@@ -2008,8 +2065,8 @@
 
     return `
       <div class="kpi">
-        <div><div class="k-l">Custo por peça</div><div class="k-v hi">${brl(c.unit)}</div>
-          <div class="k-s">${c.qtd.toLocaleString('pt-BR')} peças · total ${brl(c.total)}</div></div>
+        <div><div class="k-l">Custo por ${esc(unDe(p).nome)}</div><div class="k-v hi">${brl(c.unit)}</div>
+          <div class="k-s">${qtdUn(c.qtd, unDe(p))} · total ${brl(c.total)}</div></div>
         <div><div class="k-l">Líquido de créditos</div><div class="k-v">${brl(c.unitLiquido)}</div>
           <div class="k-s">${c.aproveita ? 'créditos ' + brl(c.creditos) : 'Simples: sem crédito'}</div></div>
         <div><div class="k-l">Multiplicador do FOB</div><div class="k-v">${c.multiplo.toFixed(2)}×</div>
@@ -2044,7 +2101,7 @@
             <span class="ref">crédito sem débito de saída para absorver</span></td>
             <td>${brl(c.icmsAcumulado)}</td></tr>` : ''}
           <tr class="sum"><td>Custo efetivo</td><td>${brl(c.liquido)}</td></tr>
-          <tr><td>Custo efetivo por peça</td><td>${brl(c.unitLiquido)}</td></tr>
+          <tr><td>Custo efetivo por ${esc(unDe(p).nome)}</td><td>${brl(c.unitLiquido)}</td></tr>
           <tr><td>Preço de venda p/ ${cfg.margemAlvo}% de margem<span class="ref">margem sobre o preço de venda</span></td><td>${brl(vendaNec)}</td></tr>
         </table>
         <p class="hint">Previsão, não cotação. Frete, despesas locais e câmbio são estimativas suas;
@@ -2391,7 +2448,7 @@
   function exportarCsv() {
     const cab = ['Nota', 'Favorito', 'Categoria', 'Situação', 'Produto', 'NCM', 'Descrição NCM', 'II %', 'IPI %',
       'PIS %', 'COFINS %', 'Risco', 'Órgãos anuentes',
-      'Antidumping', 'Fornecedor', 'Estande', 'Fase', 'Contato', 'Moeda', 'Preço FOB', 'MOQ',
+      'Antidumping', 'Fornecedor', 'Estande', 'Fase', 'Contato', 'Moeda', 'Preço FOB', 'Unidade', 'MOQ', 'Unid. MOQ',
       'Qtd', 'Peso kg', 'CBM', 'Custo/un BRL', 'Custo efetivo/un BRL', 'Multiplicador FOB',
       'Venda Brasil min', 'Venda Brasil max', 'Observações', 'Notas', 'NCM sugerida pela IA'];
     const linhas = produtos.map(p => {
@@ -2404,7 +2461,8 @@
         pc ? pc.pis : '', pc ? pc.cofins : '',
         r ? r.rotulo : 'sem NCM', r ? r.orgaos.join(' / ') : '',
         r ? r.antidumping.map(m => m.prod).join(' / ') : '',
-        p.forn, p.estande, p.fase, p.contato, p.moeda, p.preco, p.moq, p.qtd, p.peso, p.cbm,
+        p.forn, p.estande, p.fase, p.contato, p.moeda, p.preco, unDe(p).nome, p.moq,
+        p.moq ? (u => u.extenso || u.nome)(CUSTOS.unidade(p.moqUn || p.un || 'pc')) : '', p.qtd, p.peso, p.cbm,
         c ? c.unit.toFixed(2) : '', c ? c.unitLiquido.toFixed(2) : '', c ? c.multiplo.toFixed(2) : '',
         ref ? ref.min : '', ref ? ref.max : '',
         p.obs,
@@ -2509,6 +2567,10 @@
     $('#cartao').onchange = (e) => { receberCartao(e.target.files[0]); e.target.value = ''; };
     $('#btn-audio').onclick = alternarGravacao;
     $('#placa').onchange = (e) => { receberPlaca(e.target.files[0]); e.target.value = ''; };
+    $('#f-un').innerHTML = opcoesUn(CUSTOS.UNIDADES);
+    $('#f-moq-un').innerHTML = opcoesUn(CUSTOS.UNIDADES_MOQ);
+    $('#f-un').onchange = () => escolherUnidade($('#f-un').value);
+    $('#f-moq-un').onchange = () => { moqUnTocado = true; };
     $('#count-pill').onclick = abrirSync;
     $('#btn-salvar').onclick = salvarProduto;
     $$('#f-nota button').forEach(b => b.onclick = () => {

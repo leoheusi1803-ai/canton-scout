@@ -58,6 +58,11 @@ inglês sobre os 10.516 códigos, com os candidatos ranqueados.
   empresa e preenche "Nº do estande" e "Fabricante". Placa de outro estande
   apaga o contato que sobrou do fornecedor anterior (um toque desfaz). A foto
   fica no produto; sem rede, dá para ler depois pelo botão "Ler placa".
+  **Unidade**: o preço é "por" peça, m², metro, m³, kg, tonelada, conjunto,
+  par, caixa, rolo ou litro — e quantidade, peso e CBM seguem a mesma unidade.
+  O MOQ tem a dele, que também pode ser pallet ou contêiner 20'/40'. Falando
+  no áudio ("oito dólares o metro quadrado, mínimo um contêiner de quarenta"),
+  a IA preenche as duas. MOQ em contêiner não entra na conta como quantidade.
   **NCM pela IA**: com internet, a foto do produto já volta com até três NCM
   sugeridas (texto oficial, II, IPI e risco); a escolhida vai junto ao salvar.
   No produto salvo, o botão "Classificar NCM com IA" faz o mesmo — inclusive

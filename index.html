@@ -93,25 +93,30 @@
         <textarea id="f-desc" rows="2" placeholder="material, função, se é elétrico, voltagem, se tem rádio/bluetooth, uso infantil…"></textarea>
       </div>
 
-      <div class="row">
+      <div class="row row3">
         <div class="f">
-          <label for="f-preco">Preço unit. FOB</label>
+          <label for="f-preco">Preço FOB</label>
           <input id="f-preco" type="number" inputmode="decimal" step="0.01" placeholder="0,00">
         </div>
-        <div class="f f-sm">
+        <div class="f">
           <label for="f-moeda">Moeda</label>
           <select id="f-moeda"><option>USD</option><option>CNY</option></select>
         </div>
+        <div class="f">
+          <label for="f-un">Por</label>
+          <select id="f-un"></select>
+        </div>
+      </div>
+
+      <div class="row row3 moq">
+        <div class="f"><label for="f-moq">MOQ</label><input id="f-moq" type="number" inputmode="decimal" step="any" placeholder="mínimo"></div>
+        <div class="f"><label for="f-moq-un">Unid. do MOQ</label><select id="f-moq-un"></select></div>
+        <div class="f"><label for="f-qtd">Vou pedir <span class="un-txt">(peças)</span></label><input id="f-qtd" type="number" inputmode="decimal" step="any" placeholder="qtd."></div>
       </div>
 
       <div class="row">
-        <div class="f"><label for="f-moq">MOQ</label><input id="f-moq" type="number" inputmode="numeric" placeholder="peças"></div>
-        <div class="f"><label for="f-qtd">Qtd. que pretendo</label><input id="f-qtd" type="number" inputmode="numeric" placeholder="peças"></div>
-      </div>
-
-      <div class="row">
-        <div class="f"><label for="f-peso">Peso unit. (kg)</label><input id="f-peso" type="number" inputmode="decimal" step="0.001" placeholder="0,000"></div>
-        <div class="f"><label for="f-cbm">CBM unit. (m³)</label><input id="f-cbm" type="number" inputmode="decimal" step="0.00001" placeholder="0,00000"></div>
+        <div class="f"><label for="f-peso">Peso por <span class="un-txt">peça</span> (kg)</label><input id="f-peso" type="number" inputmode="decimal" step="0.001" placeholder="0,000"></div>
+        <div class="f"><label for="f-cbm">CBM por <span class="un-txt">peça</span> (m³)</label><input id="f-cbm" type="number" inputmode="decimal" step="0.00001" placeholder="0,00000"></div>
       </div>
 
       <div class="f">

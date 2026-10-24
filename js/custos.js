@@ -47,11 +47,39 @@ const CUSTOS = (() => {
 
   const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 
+  /* Unidade de venda: preço, quantidade, peso e CBM são POR ela. Pedra,
+     painel e piso se vendem por m²; louça, por peça ou conjunto. Produto
+     salvo antes da v25 não tem unidade: vale peça, como sempre valeu. */
+  const UNIDADES = [
+    { id: 'pc', nome: 'peça', curto: 'pç' },
+    { id: 'm2', nome: 'm²', curto: 'm²' },
+    { id: 'm', nome: 'metro', curto: 'm' },
+    { id: 'm3', nome: 'm³', curto: 'm³' },
+    { id: 'kg', nome: 'kg', curto: 'kg' },
+    { id: 't', nome: 'tonelada', curto: 't' },
+    { id: 'cj', nome: 'conjunto', curto: 'cj' },
+    { id: 'par', nome: 'par', curto: 'par' },
+    { id: 'cx', nome: 'caixa', curto: 'cx' },
+    { id: 'rolo', nome: 'rolo', curto: 'rolo' },
+    { id: 'l', nome: 'litro', curto: 'L' }
+  ];
+  // o pedido mínimo pode ser um embarque inteiro: "um contêiner de 40"
+  const UNIDADES_MOQ = UNIDADES.concat([
+    { id: 'pallet', nome: 'pallet', curto: 'pallet' },
+    // na lista, curto para caber no celular; no texto e na planilha, por extenso
+    { id: 'c20', nome: "cont. 20'", curto: "contêiner 20'", extenso: "contêiner 20'" },
+    { id: 'c40', nome: "cont. 40'", curto: "contêiner 40'", extenso: "contêiner 40'" }
+  ]);
+  const unidade = (id) => UNIDADES_MOQ.find(u => u.id === id) || UNIDADES[0];
+  // o MOQ só serve de quantidade quando está na unidade do preço: 1 contêiner não é 1 m²
+  const qtdDoPedido = (p) => num(p.qtd) || ((p.moqUn || p.un || 'pc') === (p.un || 'pc') ? num(p.moq) : 0);
+
   function calcular(p, cfg) {
     const L = [];                                  // linhas do extrato
     const add = (grupo, rotulo, valor, ref) => { L.push({ grupo, rotulo, valor, ref }); return valor; };
 
-    const qtd = Math.max(1, num(p.qtd) || num(p.moq) || 1);
+    const q = qtdDoPedido(p);
+    const qtd = q > 0 ? q : 1;
     const cambio = p.moeda === 'CNY' ? num(cfg.cnyBrl) : num(cfg.usdBrl);
     const usdBrl = num(cfg.usdBrl);
 
@@ -59,7 +87,7 @@ const CUSTOS = (() => {
     const fobUnit = num(p.preco);
     const fob = fobUnit * qtd * cambio;
     add('merc', 'Mercadoria FOB', fob,
-      `${qtd.toLocaleString('pt-BR')} un × ${p.moeda} ${fobUnit.toFixed(2)} × ${cambio.toFixed(4)}`);
+      `${qtd.toLocaleString('pt-BR')} ${unidade(p.un).curto} × ${p.moeda} ${fobUnit.toFixed(2)} × ${cambio.toFixed(4)}`);
 
     /* ---------- 2. frete internacional ---------- */
     const aereo = cfg.modal === 'aereo';
@@ -227,5 +255,6 @@ const CUSTOS = (() => {
     margemAlvo: 45
   };
 
-  return { calcular, precoVenda, pisCofinsDe, CFG_PADRAO, PIS_IMP, COFINS_IMP, AFRMM };
+  return { calcular, precoVenda, pisCofinsDe, CFG_PADRAO, PIS_IMP, COFINS_IMP, AFRMM,
+    UNIDADES, UNIDADES_MOQ, unidade, qtdDoPedido };
 })();
