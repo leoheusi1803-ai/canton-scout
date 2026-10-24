@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v18 · 15/10/2026 · QR';
+  const VERSAO = 'v19 · 24/10/2026 · foto';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -129,7 +129,7 @@
       el.innerHTML = `<div class="card tight"><p class="hint" style="margin:0">${esc(m)}</p></div>`;
     })
       .then(() => VISAO.classificar(blob, 3))
-      .then(({ sugestoes, fracas, bruto, diag }) => {
+      .then(({ sugestoes, fracas, termo, bruto, diag }) => {
         // o diagnóstico fica sempre disponível: sem ele é impossível saber
         // POR QUE uma foto óbvia não foi reconhecida
         const detalhe = `<details style="margin-top:10px">
@@ -159,6 +159,25 @@
              sempre um toque errado, e ainda ancoraria a pessoa numa resposta
              ruim. Vira texto informativo, e o caminho é o modo Guiado.      */
           const palpite = (fracas[0] || null);
+          if (termo) {
+            el.innerHTML = `<div class="card">
+              <h3 style="margin-bottom:4px">Parece ser: ${esc(termo.q)}</h3>
+              <p class="hint" style="margin:0 0 9px">O modelo viu <b>${esc(termo.rot)}</b>
+              (${Math.round(termo.p * 100)}%), mas esse produto não está no modo Guiado.
+              Busque na tabela e confira o texto da NCM antes de escolher.</p>
+              <button id="sug-buscar" class="primary">Buscar “${esc(termo.q)}” na NCM</button>
+              ${detalhe}</div>`;
+            $('#sug-buscar').onclick = () => {
+              $$('#ncm-modo button').forEach(x => x.classList.toggle('on', x.dataset.v === 'busca'));
+              $('#m-guiado').hidden = true;
+              $('#m-busca').hidden = false;
+              $('#q').value = termo.q;
+              buscarNcm();
+              ir('ncm');
+            };
+            try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { }
+            return;
+          }
           el.innerHTML = `<div class="card">
             <h3 style="margin-bottom:4px">Não reconheci</h3>
             <p class="hint" style="margin:0">${palpite
@@ -210,6 +229,27 @@
     });
   }
 
+  /* Versão nova baixada no meio da feira: recarregar com foto ou preço
+     ainda não salvos jogaria o cadastro fora. Espera o formulário ficar
+     vazio, depois de salvar. Nunca ao ir para segundo plano: abrir a
+     câmera também esconde a página, e a foto voltaria para um app
+     recarregado. Se não der antes, a versão nova entra ao reabrir.  */
+  let versaoNova = false;
+  function capturaEmAndamento() {
+    return pendentes.length > 0 ||
+      ['f-nome', 'f-desc', 'f-preco', 'f-obs'].some(id => $('#' + id).value.trim());
+  }
+  function recarregarSePuder() {
+    if (!versaoNova) return;
+    if (capturaEmAndamento()) {
+      toast('Versão nova pronta · entra quando você salvar este produto');
+      return;
+    }
+    versaoNova = false;
+    toast('Versão nova baixada · recarregando…');
+    setTimeout(() => location.reload(), 2200);
+  }
+
   function limparForm() {
     ['f-nome', 'f-desc', 'f-preco', 'f-moq', 'f-qtd', 'f-peso', 'f-cbm', 'f-obs'].forEach(id => $('#' + id).value = '');
     pendentes = []; renderThumbs();
@@ -218,6 +258,7 @@
     document.querySelector('#sugestao').innerHTML = '';
     document.querySelector('#cap-erro').innerHTML = '';
     // fornecedor/estande/contato ficam: normalmente são vários produtos do mesmo estande
+    recarregarSePuder();
   }
 
   function salvarProduto() {
@@ -1804,8 +1845,8 @@
           if (!novo) return;
           novo.addEventListener('statechange', () => {
             if (novo.state === 'installed' && navigator.serviceWorker.controller) {
-              toast('Versão nova baixada · recarregando…');
-              setTimeout(() => location.reload(), 2200);
+              versaoNova = true;
+              recarregarSePuder();
             }
           });
         });
