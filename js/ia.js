@@ -1,11 +1,11 @@
 /* ============================================================
-   ia.js — leitura do cartão do fornecedor, do áudio e do número de
-   contêiner, pela IA.
+   ia.js — leitura do cartão do fornecedor, do áudio e da placa do
+   estande, pela IA.
 
-   Só funciona com internet, e nunca é obrigatória: a foto do cartão e o
-   áudio ficam gravados no aparelho de qualquer jeito. A IA só poupa a
-   digitação — e o que ela devolve vai para os campos, onde a pessoa vê
-   e corrige antes de salvar.
+   Só funciona com internet, e nunca é obrigatória: as fotos do cartão e
+   da placa e o áudio ficam gravados no aparelho de qualquer jeito. A IA
+   só poupa a digitação — e o que ela devolve vai para os campos, onde a
+   pessoa vê e corrige antes de salvar.
 
    Passa pelo n8n da Heusi, que guarda a chave da OpenAI: a chave nunca
    fica no celular nem no repositório, que é público. O código da viagem
@@ -54,10 +54,10 @@ const IA = (() => {
     return comoDataUrl(blob).then(audio => chamar({ tipo: 'audio', viagem, audio }));
   }
 
-  /* devolve { conteineres: [{ numero, tipo_iso, tara_kg, peso_max_kg, lacre }], observacao } */
-  function lerContainer(blob, viagem) {
-    return comoDataUrl(blob).then(imagem => chamar({ tipo: 'container', viagem, imagem }));
+  /* devolve { estande, empresa, observacao } — estande no formato da feira, "11.2 K23" */
+  function lerEstande(blob, viagem) {
+    return comoDataUrl(blob).then(imagem => chamar({ tipo: 'estande', viagem, imagem }));
   }
 
-  return { lerCartao, lerAudio, lerContainer };
+  return { lerCartao, lerAudio, lerEstande };
 })();
