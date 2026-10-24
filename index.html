@@ -48,10 +48,22 @@
         <span class="shoot-ico">&#128194;</span>
         <span class="shoot-txt">Escolher da galeria<small>fotos e vídeos já tirados</small></span>
       </label>
+      <div class="shoot-row">
+        <label class="shoot shoot-alt shoot-mini">
+          <input type="file" id="cartao" accept="image/*" capture="environment" hidden>
+          <span class="shoot-ico">&#128199;</span>
+          <span class="shoot-txt">Foto do cartão<small>vale como contato</small></span>
+        </label>
+        <button type="button" id="btn-audio" class="shoot shoot-alt shoot-mini">
+          <span class="shoot-ico">&#127908;</span>
+          <span class="shoot-txt">Gravar áudio<small>fale preço e detalhes</small></span>
+        </button>
+      </div>
     </div>
 
     <div id="thumbs" class="thumbs"></div>
     <div id="sugestao"></div>
+    <div id="ia-res"></div>
 
     <div class="card">
       <div class="f">
@@ -106,7 +118,7 @@
       </div>
       <div class="f">
         <label for="f-contato">Contato — WeChat, e-mail ou telefone <b>*</b></label>
-        <input id="f-contato" type="text" placeholder="peça o cartão e copie o WeChat ID">
+        <input id="f-contato" type="text" placeholder="ou tire a foto do cartão, lá em cima">
       </div>
 
       <div class="f">
@@ -125,7 +137,7 @@
       <div id="cap-erro"></div>
       <button id="btn-salvar" class="primary big">Salvar produto</button>
       <p class="hint">Salva no aparelho, sem internet. Fabricante e contato são obrigatórios:
-      sem eles você não fecha nada depois da feira.</p>
+      sem eles você não fecha nada depois da feira. A foto do cartão vale como contato.</p>
     </div>
   </section>
 
@@ -311,6 +323,7 @@
 <script src="js/custos.js"></script>
 <script src="js/visao.js"></script>
 <script src="js/sync.js"></script>
+<script src="js/ia.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>
