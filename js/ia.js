@@ -1,6 +1,6 @@
 /* ============================================================
    ia.js — leitura do cartão do fornecedor, do áudio e da placa do
-   estande, pela IA.
+   estande, e a sugestão de NCM pela foto, pela IA.
 
    Só funciona com internet, e nunca é obrigatória: as fotos do cartão e
    da placa e o áudio ficam gravados no aparelho de qualquer jeito. A IA
@@ -14,6 +14,8 @@
    ============================================================ */
 const IA = (() => {
   const URL_IA = 'https://n8nv2-n8n.5hfq7e.easypanel.host/webhook/canton-scout-ia';
+  // fluxo à parte ("Canton Scout - Classificar NCM"): mexer nele não arrisca o do cartão
+  const URL_NCM = 'https://n8nv2-n8n.5hfq7e.easypanel.host/webhook/canton-scout-ncm';
   const TEMPO = 60000;
 
   function comoDataUrl(blob) {
@@ -25,9 +27,9 @@ const IA = (() => {
     });
   }
 
-  function chamar(corpo) {
+  function chamar(corpo, url) {
     return Promise.race([
-      fetch(URL_IA, {
+      fetch(url || URL_IA, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(corpo)
@@ -59,5 +61,20 @@ const IA = (() => {
     return comoDataUrl(blob).then(imagem => chamar({ tipo: 'estande', viagem, imagem }));
   }
 
-  return { lerCartao, lerAudio, lerEstande };
+  /* 1ª etapa da NCM: a IA olha a foto (Blob do aparelho ou data URL da
+     miniatura sincronizada) e o que foi anotado.
+     devolve { produto, descricao, candidatos: [{ ncm, motivo, confirmar }], observacao } */
+  function classificarNcm(imagem, texto, viagem) {
+    const foto = !imagem ? Promise.resolve('')
+      : (typeof imagem === 'string' ? Promise.resolve(imagem) : comoDataUrl(imagem));
+    return foto.then(img => chamar({ viagem, imagem: img, texto: texto || '' }, URL_NCM));
+  }
+
+  /* 2ª etapa: escolhe, entre os itens OFICIAIS que o app manda, o de cada posição.
+     devolve { escolhas: [{ ncm, motivo }] } */
+  function escolherItemNcm(dados, viagem) {
+    return chamar(Object.assign({ etapa: 'item', viagem }, dados), URL_NCM);
+  }
+
+  return { lerCartao, lerAudio, lerEstande, classificarNcm, escolherItemNcm };
 })();
