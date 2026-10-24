@@ -54,6 +54,10 @@ inglês sobre os 10.516 códigos, com os candidatos ranqueados.
   IA lê o cartão (fabricante, WeChat, telefone, estande) e transcreve o áudio
   (preço, MOQ, detalhes) direto nos campos. Sem rede, dá para ler depois no
   produto, pelos botões "Ler cartão" e "Transcrever áudio".
+  **Ler número de container**: foto da porta do contêiner, do BL ou de um
+  print; a IA lê o(s) número(s), tipo ISO, tara e lacre, e o app confere o
+  dígito verificador da ISO 6346 antes de deixar copiar ou compartilhar.
+  Os últimos 20 lidos ficam guardados no aparelho.
 - **Produtos** — lista com o selo de risco e o custo por peça já calculado.
   Ordena por pior risco ou menor custo. Exporta backup (.json, com as fotos)
   e planilha (.csv, abre no Excel).
@@ -78,8 +82,8 @@ Sem código, o topo mostra **sem sync** e nada sai do aparelho.
 
 O app chama o fluxo **Canton Scout - Ler Cartão e Áudio** no n8n da Heusi
 (`/webhook/canton-scout-ia`), que guarda a chave da OpenAI — a chave nunca vai
-para o celular nem para este repositório. Cartão: GPT-4o com visão. Áudio:
-Whisper transcreve e o GPT-4o mini separa preço, MOQ e detalhes. O fluxo só
+para o celular nem para este repositório. Cartão e container: GPT-4o com visão.
+Áudio: Whisper transcreve e o GPT-4o mini separa preço, MOQ e detalhes. O fluxo só
 atende quem manda o código da viagem certo; **se trocarem o código, troque
 também no nó "Conferir e Preparar"** do fluxo.
 
