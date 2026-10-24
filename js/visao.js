@@ -161,6 +161,8 @@ const VISAO = (() => {
     return paraImagem(blob).then(img => {
       const centro = recortarQuadrado(img);
       const inteira = enquadrarInteira(img);
+      const tamanho = img.width + '×' + img.height;
+      if (img.close) img.close();      // ImageBitmap: solta a memória já (zera width/height)
 
       let melhor = null;
       const tentadas = [];
@@ -204,7 +206,7 @@ const VISAO = (() => {
         diag: {
           ms: Date.now() - t0,
           backend: (tf.getBackend && tf.getBackend()) || '?',
-          imagem: img.width + '×' + img.height,
+          imagem: tamanho,
           vista: melhor ? melhor.vista : '—',
           tentadas: tentadas
         }
