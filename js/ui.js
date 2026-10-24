@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v22 · 24/10/2026 · container';
+  const VERSAO = 'v23 · 24/10/2026 · estande';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -122,9 +122,11 @@
   const ehMeu = (p) => !p.autor || mesmoNome(p.autor, cfg.dispositivo);
 
   /* miniatura feita na hora de salvar, da foto que ainda está na memória:
-     fica dentro do produto e sincroniza, mesmo que o iPhone perca a foto */
+     fica dentro do produto e sincroniza, mesmo que o iPhone perca a foto.
+     Cartão e placa do estande não são o produto: ficam de fora. */
+  const fotoDoProduto = (m) => (m.tipo || '').startsWith('image') && !m.cartao && !m.placa;
   function miniaturaDe(midias) {
-    const foto = midias.find(m => (m.tipo || '').startsWith('image') && !m.cartao);
+    const foto = midias.find(fotoDoProduto);
     return foto ? imagemReduzida(foto.blob, 320, 0.6).catch(() => null) : Promise.resolve(null);
   }
 
@@ -267,6 +269,8 @@
         corpo = `<video src="${u}" muted playsinline></video><span class="vid">▶ vídeo</span>`;
       } else if (m.cartao) {
         corpo = `<img src="${u}" alt=""><span class="vid">📇 cartão</span>`;
+      } else if (m.placa) {
+        corpo = `<img src="${u}" alt=""><span class="vid">📍 placa</span>`;
       } else {
         corpo = `<img src="${u}" alt=""><span class="vid">🔍 tocar</span>`;
         toque = ` data-re="${m.id}" title="tocar para reconhecer de novo"`;
@@ -297,6 +301,8 @@
      se a pessoa salvar antes de a IA responder, a resposta não cai no
      produto seguinte.                                                */
   let capturaAtual = 0;
+  // captura em que a placa do estande foi lida: o número dela vale mais que o do cartão
+  let placaLida = -1;
 
   // a IA devolve número, mas pode vir texto: "1,20" é decimal; "1,000.50", milhar em inglês
   const numero = (v) => {
@@ -350,16 +356,21 @@
   }
 
   /* pode chamar a IA agora? se não, explica por quê */
+  const GUARDADO = {
+    'Cartão': ['Cartão guardado', 'Ler cartão'],
+    'Áudio': ['Áudio guardado', 'Transcrever áudio'],
+    'Placa': ['Placa guardada', 'Ler placa']
+  };
   function iaDisponivel(oQue) {
+    const [guardado, botao] = GUARDADO[oQue];
     if (!SYNC.ativo()) {
-      avisoIa(oQue + ' guardado no produto',
+      avisoIa(guardado + ' no produto',
         'Para a IA ler, preencha o <b>código da viagem</b> em Config.');
       return false;
     }
     if (!navigator.onLine) {
-      avisoIa(oQue + ' guardado no produto',
-        'Sem internet agora. Depois, abra o produto e toque em <b>' +
-        (oQue === 'Cartão' ? 'Ler cartão' : 'Transcrever áudio') + '</b>.');
+      avisoIa(guardado + ' no produto',
+        'Sem internet agora. Depois, abra o produto e toque em <b>' + botao + '</b>.');
       return false;
     }
     return true;
@@ -381,7 +392,8 @@
         // cartão novo é fornecedor novo: troca o que ficou do estande anterior
         if (c.forn) { $('#f-forn').value = c.forn; feito.push('fabricante'); }
         if (c.contato) { $('#f-contato').value = c.contato; feito.push('contato'); }
-        if (c.estande) { $('#f-estande').value = c.estande; feito.push('estande'); }
+        // o número impresso no cartão pode ser de outra feira; o da placa é o de agora
+        if (c.estande && placaLida !== capturaAtual) { $('#f-estande').value = c.estande; feito.push('estande'); }
         if (c.obs && !$('#f-obs').value.includes(c.obs)) $('#f-obs').value = juntar($('#f-obs').value, c.obs);
         avisoIa(feito.length ? 'Li o cartão' : 'Não achei dados no cartão',
           feito.length ? esc([c.forn, c.contato].filter(Boolean).join(' — ')) +
@@ -472,104 +484,92 @@
     });
   }
 
-  /* ---------------- número de contêiner ----------------
-     Digitar MSKU1234565 no celular é onde nasce o erro de um caractere.
-     A IA lê a foto (porta, BL, print) e o app confere o dígito
-     verificador da ISO 6346: se não bater, avisa antes de alguém copiar
-     o número errado para o despachante ou para o rastreio.            */
-  const VALOR_ISO = (() => {
-    // A=10, B=12, C=13… pulando os múltiplos de 11
-    const v = {};
-    let n = 10;
-    for (let c = 65; c <= 90; c++) {
-      if (n % 11 === 0) n++;
-      v[String.fromCharCode(c)] = n++;
-    }
-    return v;
-  })();
+  /* ---------------- placa do estande ----------------
+     A placa no alto do estande traz o número (11.2 K23) e o nome da
+     empresa. A foto fica no produto, como a do cartão: sem internet no
+     pavilhão, dá para ler depois, no produto.
+     Placa de outro estande é fornecedor novo: o que ficou do estande
+     anterior sai dos campos, para o WeChat de um não ir parar no
+     produto do outro. Se a IA leu errado, um toque desfaz.          */
+  const soLetrasNumeros = (s) => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // "Huameng" e "CHAOZHOU HUAMENG CERAMICS CO., LTD." são o mesmo fornecedor
+  const nomeBase = (s) => (s || '').toLowerCase()
+    .replace(/\b(co|ltd|limited|company|corp|inc|factory|group)\b/g, '')
+    .replace(/[^a-z0-9\u4e00-\u9fff]/g, '');
+  const mesmaEmpresa = (a, b) => {
+    const x = nomeBase(a), y = nomeBase(b);
+    return !!x && !!y && (x.includes(y) || y.includes(x));
+  };
 
-  function digitoContainer(s10) {
-    let soma = 0;
-    for (let i = 0; i < 10; i++) soma += (/\d/.test(s10[i]) ? +s10[i] : VALOR_ISO[s10[i]]) * Math.pow(2, i);
-    return (soma % 11) % 10;
+  function camposDaPlaca(d) {
+    return { estande: (d.estande || '').trim(), forn: (d.empresa || '').trim(), obs: (d.observacao || '').trim() };
   }
 
-  function conferirContainer(numero) {
-    const n = String(numero || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (!/^[A-Z]{3}[UJZ]\d{6}\d?$/.test(n))
-      return { n, ok: false, motivo: 'fora do padrão (4 letras e 7 algarismos) — confira na foto' };
-    const esperado = digitoContainer(n.slice(0, 10));
-    if (n.length === 10) return { n, ok: false, motivo: 'faltou o dígito verificador; pela conta é ' + esperado };
-    return +n[10] === esperado ? { n, ok: true }
-      : { n, ok: false, motivo: 'o dígito verificador não confere (pela conta seria ' + esperado + '): algum caractere foi lido errado' };
-  }
+  // o campo ainda tem o que veio do produto anterior (não foi digitado agora)?
+  const herdado = (campo) => {
+    const v = $('#f-' + campo).value.trim();
+    return !!v && v === ((cfg.ultimoForn || {})[campo] || '').trim();
+  };
 
-  const formatarContainer = (n) => n.length === 11 ? n.slice(0, 4) + ' ' + n.slice(4, 10) + ' ' + n.slice(10) : n;
+  const NOME_CAMPO = { forn: 'o fabricante', estande: 'o estande', contato: 'o contato' };
 
-  function copiar(texto) {
-    const ok = () => toast('Copiado: ' + texto);
-    const velho = () => {
-      const t = document.createElement('textarea');
-      t.value = texto; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
-      document.body.appendChild(t); t.select(); t.setSelectionRange(0, texto.length);
-      let feito = false;
-      try { feito = document.execCommand('copy'); } catch (e) { }
-      t.remove();
-      if (feito) ok(); else toast('Não consegui copiar: segure o número para copiar');
+  function aplicarPlaca(c) {
+    const campos = ['forn', 'estande', 'contato'];
+    const antes = {}, veio = {};
+    campos.forEach(k => { antes[k] = $('#f-' + k).value; veio[k] = herdado(k); });
+    /* Mudou de estande desde o último produto salvo? É de lá que vem o que
+       pode estar velho nos campos. Compara com ele, e não com o campo, que o
+       cartão pode ter acabado de preencher com o número de outra feira.
+       O número decide; sem número, o nome da empresa. */
+    const ult = cfg.ultimoForn || {};
+    const outro = c.estande && (ult.estande || '').trim()
+      ? soLetrasNumeros(c.estande) !== soLetrasNumeros(ult.estande)
+      : !!(c.forn && (ult.forn || '').trim() && !mesmaEmpresa(c.forn, ult.forn));
+    if (c.estande) { $('#f-estande').value = c.estande; placaLida = capturaAtual; }
+    // o nome digitado agora fica; o que sobrou do estande anterior, não
+    if (c.forn && (!antes.forn.trim() || (outro && veio.forn))) $('#f-forn').value = c.forn;
+    const apagados = [];
+    if (outro) campos.forEach(k => {
+      if (!c[k] && veio[k]) { $('#f-' + k).value = ''; apagados.push(NOME_CAMPO[k]); }
+    });
+    const mudou = campos.some(k => $('#f-' + k).value !== antes[k]);
+
+    const titulo = c.estande ? 'Li a placa: estande ' + esc(c.estande)
+      : c.forn ? 'Li a placa, mas não o número do estande' : 'Não achei o número do estande na foto';
+    const linhas = c.forn ? [esc(c.forn)] : [];
+    if (apagados.length) linhas.push('<b>Outro estande</b>: apaguei ' + apagados.join(' e ') + ' do anterior.'
+      + (apagados.includes('o contato') ? ' Tire a foto do cartão ou digite o contato.' : ''));
+    else if (!c.estande) linhas.push((c.obs ? esc(c.obs) + '<br>' : '') + 'Digite o número, ou tire outra foto mais de perto.');
+    else if (outro) linhas.push('<b>Outro estande</b>: confira o fabricante e o contato.');
+    else if ((ult.estande || '').trim()) linhas.push('Mesmo estande do produto anterior.');
+    else if (antes.forn.trim() || antes.contato.trim()) linhas.push('Confira se o fabricante e o contato são deste estande.');
+    else linhas.push('Confira o número antes de salvar.');
+    avisoIa(titulo, linhas.join('<br>') + (mudou ? ' <button type="button" class="link" id="ia-desfazer">↩ desfazer</button>' : ''));
+    if (mudou) $('#ia-desfazer').onclick = () => {
+      campos.forEach(k => $('#f-' + k).value = antes[k]);
+      placaLida = -1;
+      avisoIa('Voltei o que estava antes', 'A foto da placa continua no produto.');
     };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(ok, velho);
-    else velho();
   }
 
-  function guardarContainers(lidos) {
-    const novos = lidos.filter(c => c.n).map(c => ({ n: c.n, ok: c.ok, tipo: c.tipo || '', lacre: c.lacre || '', t: Date.now() }));
-    const resto = (cfg.conteineres || []).filter(h => !novos.some(c => c.n === h.n));
-    cfg.conteineres = novos.concat(resto).slice(0, 20);
-    DB.setCfg('conteineres', cfg.conteineres);
-    $('#ctn-hist').hidden = false;
-  }
-
-  /* lidos = null abre só a lista dos últimos */
-  function mostrarContainers(lidos, observacao) {
-    const cartao = (c) => `<div class="ctn${c.ok ? '' : ' warn'}">
-        <div class="ctn-num">${esc(formatarContainer(c.n))}</div>
-        <div class="ctn-info">${c.ok ? '✓ dígito verificador confere' : '⚠ ' + esc(c.motivo)}
-          ${[c.tipo, c.tara && 'tara ' + c.tara.toLocaleString('pt-BR') + ' kg',
-            c.max && 'máx. ' + c.max.toLocaleString('pt-BR') + ' kg', c.lacre && 'lacre ' + c.lacre]
-            .filter(Boolean).map(x => '<br>' + esc(x)).join('')}</div>
-        <div class="ctn-acoes"><button class="ghost" data-copiar="${esc(c.n)}">Copiar</button>
-          ${navigator.share ? `<button class="ghost" data-partilhar="${esc(c.n)}">Compartilhar</button>` : ''}</div>
-      </div>`;
-    const hist = (cfg.conteineres || []).filter(h => !(lidos || []).some(c => c.n === h.n));
-    const titulo = !lidos ? 'Containers já lidos'
-      : lidos.length > 1 ? 'Containers lidos' : lidos.length ? 'Container lido' : 'Container';
-    modal(`<h3 style="margin-bottom:10px">${titulo}</h3>
-      ${lidos ? (lidos.length ? lidos.map(cartao).join('') : '<p>Não achei número de container na foto.</p>') : ''}
-      ${observacao ? `<p class="hint" style="margin:0 0 12px">${esc(observacao)}</p>` : ''}
-      ${hist.length ? `${lidos ? '<h3 style="margin:16px 0 4px">Últimos lidos</h3>' : ''}` + hist.map(h =>
-        `<div class="ctn-hist"><span>${esc(formatarContainer(h.n))}${h.ok ? '' : '<small>⚠</small>'}</span>
-          <button class="ghost" data-copiar="${esc(h.n)}">Copiar</button></div>`).join('')
-        : (lidos ? '' : '<p class="hint">Nenhum ainda.</p>')}`);
-    $('#modal-body').querySelectorAll('[data-copiar]').forEach(b => b.onclick = () => copiar(b.dataset.copiar));
-    $('#modal-body').querySelectorAll('[data-partilhar]').forEach(b => b.onclick = () =>
-      navigator.share({ text: b.dataset.partilhar }).catch(() => {}));
-  }
-
-  function receberContainer(file) {
+  function receberPlaca(file) {
     if (!file) return;
-    if (!SYNC.ativo()) { toast('Preencha o código da viagem em Config para ler containers'); return; }
-    if (!navigator.onLine) { toast('Sem internet agora: a leitura do container precisa de rede'); return; }
-    modal('<h3 style="margin-bottom:8px">Container</h3><p class="hint" style="margin:0">lendo o número…</p>');
-    comprimir(file)
-      .then(b => IA.lerContainer(b, SYNC.codigo()))
-      .then(d => {
-        const lidos = (d.conteineres || []).map(c => Object.assign(conferirContainer(c.numero),
-          { tipo: c.tipo_iso, tara: c.tara_kg, max: c.peso_max_kg, lacre: c.lacre }));
-        guardarContainers(lidos);
-        mostrarContainers(lidos, d.observacao);
-      })
-      .catch(e => modal(`<h3 style="margin-bottom:8px">Container</h3>
-        <p class="hint" style="margin:0">Não consegui ler: ${esc(e.message)}. Tente de novo com a foto mais de perto.</p>`));
+    comprimir(file).then(b => {
+      const m = { id: DB.novoId(), blob: b, tipo: b.type || file.type || 'image/jpeg', nome: file.name, placa: true };
+      pendentes.push(m);
+      renderThumbs();
+      if (!iaDisponivel('Placa')) return;
+      const minha = capturaAtual;
+      avisoIa('Lendo a placa…', 'pode continuar preenchendo');
+      IA.lerEstande(m.blob, SYNC.codigo()).then(d => {
+        if (minha !== capturaAtual) return;
+        aplicarPlaca(camposDaPlaca(d));
+      }).catch(e => {
+        if (minha !== capturaAtual) return;
+        avisoIa('Placa guardada, mas não consegui ler', esc(e.message) +
+          '. Digite o número do estande, ou leia depois, no produto.');
+      });
+    });
   }
 
   /* Versão nova baixada no meio da feira: recarregar com foto ou preço
@@ -646,7 +646,7 @@
       criado: Date.now(), atualizado: Date.now()
     };
     const midias = pendentes.map(m => ({ id: m.id, produtoId: id, blob: m.blob, tipo: m.tipo, nome: m.nome,
-      cartao: !!m.cartao, audio: !!m.audio }));
+      cartao: !!m.cartao, audio: !!m.audio, placa: !!m.placa }));
     miniaturaDe(midias)
       .then(mini => { if (mini) p.miniatura = mini; return DB.salvarProduto(p); })
       .then(() => Promise.all(midias.map(m => DB.salvarMidia(m))))
@@ -777,8 +777,7 @@
     // carrega as fotos de forma assíncrona
     lista.forEach(p => DB.midiasDe(p.id).then(ms => {
       const img = el.querySelector(`[data-pic="${p.id}"]`);
-      const foto = ms.find(m => (m.tipo || '').startsWith('image') && !m.cartao)
-        || ms.find(m => (m.tipo || '').startsWith('image'));
+      const foto = ms.find(fotoDoProduto) || ms.find(m => (m.tipo || '').startsWith('image'));
       // produto de outro celular não tem a foto aqui: vem a miniatura
       if (!img) return;
       semFoto(img, p);
@@ -849,13 +848,17 @@
     DB.midiasDe(id).then(ms => {
       const audios = ms.filter(m => m.audio);
       const cartoes = ms.filter(m => m.cartao);
-      let fotos = ms.filter(m => !m.audio && !m.cartao).map(m => {
+      const placas = ms.filter(m => m.placa);
+      let fotos = ms.filter(m => !m.audio && !m.cartao && !m.placa).map(m => {
         const u = blobUrl(m.id, m.blob);
         return (m.tipo || '').startsWith('video')
           ? `<div class="thumb"><video src="${u}" controls playsinline></video></div>`
           : `<div class="thumb"><img src="${u}" alt=""></div>`;
       }).join('');
       if (!fotos && p.miniatura) fotos = `<div class="thumb"><img src="${esc(p.miniatura)}" alt=""></div>`;
+      // a placa vai junto das fotos, pequena: dela só se precisa do número
+      fotos += placas.map(m => `<div class="thumb"><img src="${blobUrl(m.id, m.blob)}" alt="placa" data-placa="1">
+        <span class="vid">📍 placa</span></div>`).join('');
       // o cartão em tamanho de leitura: é dele que sai o WeChat
       const cartaoHtml = cartoes.map(m => `<img class="cartao-img" src="${blobUrl(m.id, m.blob)}" alt="cartão">`).join('');
       const sons = audios.map(m => `<audio controls preload="none" src="${blobUrl(m.id, m.blob)}"></audio>`).join('');
@@ -867,8 +870,9 @@
         ${fotos ? `<div class="thumbs">${fotos}</div>` : ''}
         ${cartaoHtml}
         ${sons ? `<div class="sons">${sons}</div>` : ''}
-        ${cartoes.length || audios.length ? `<div style="margin:0 0 10px">
+        ${cartoes.length || placas.length || audios.length ? `<div style="margin:0 0 10px">
           ${cartoes.length ? '<button class="ghost" id="m-ler-cartao">📇 Ler cartão com a IA</button>' : ''}
+          ${placas.length ? '<button class="ghost" id="m-ler-placa">📍 Ler placa com a IA</button>' : ''}
           ${audios.length ? '<button class="ghost" id="m-ler-audio">🎤 Transcrever áudio com a IA</button>' : ''}
         </div>` : ''}
         ${p.desc ? `<p style="font-size:13.5px;color:var(--dim)">${esc(p.desc)}</p>` : ''}
@@ -915,7 +919,8 @@
           <button class="ghost danger" id="m-apagar">Apagar produto</button>
         </div>`);
       /* ---- situação, categoria e notas ---- */
-      $('#modal-body').querySelectorAll('.thumbs img').forEach(i => semFoto(i, p));
+      // placa que não abre não vira a miniatura do produto
+      $('#modal-body').querySelectorAll('.thumbs img').forEach(i => semFoto(i, i.dataset.placa ? null : p));
       const salvar = () => { p.atualizado = Date.now(); agendarSync(); return DB.salvarProduto(p); };
       /* ---- leitura que ficou para depois (sem internet no pavilhão) ---- */
       const podeLer = () => {
@@ -935,6 +940,18 @@
           if (c.obs && !(p.obs || '').includes(c.obs)) p.obs = juntar(p.obs, c.obs);
           return releu(c.forn || c.contato ? 'Cartão lido' : 'Não achei dados no cartão');
         }).catch(e => toast('Não li o cartão: ' + e.message));
+      };
+      if ($('#m-ler-placa')) $('#m-ler-placa').onclick = () => {
+        if (!podeLer()) return;
+        toast('Lendo a placa…');
+        IA.lerEstande(placas[placas.length - 1].blob, SYNC.codigo()).then(d => {
+          const c = camposDaPlaca(d);
+          if (!c.estande) { toast('Não achei o número do estande na foto'); return; }
+          p.estande = c.estande;
+          // o fabricante salvo fica; nome diferente na placa vai para as observações
+          if (c.forn && !mesmaEmpresa(c.forn, p.forn) && !(p.obs || '').includes(c.forn)) p.obs = juntar(p.obs, 'Placa: ' + c.forn);
+          return releu('Estande ' + c.estande);
+        }).catch(e => toast('Não li a placa: ' + e.message));
       };
       if ($('#m-ler-audio')) $('#m-ler-audio').onclick = () => {
         if (!podeLer()) return;
@@ -1445,7 +1462,9 @@
      quantidade já vêm da calculadora; o estande e o contato ficam lembrados,
      porque no mesmo estande se captura vários produtos seguidos. */
   function formSalvar(ncm, it) {
-    const ult = cfg.ultimoForn || {};
+    // os campos da captura: o cartão ou a placa podem ter acabado de trocar o fornecedor
+    const ult = $('#f-forn') ? { forn: $('#f-forn').value.trim(), contato: $('#f-contato').value.trim(),
+      estande: $('#f-estande').value.trim(), fase: $('#f-fase').value } : (cfg.ultimoForn || {});
     const nomeSugerido = guia.prod ? guia.prod.n.split(' / ')[0] : '';
     const nomeDigitado = $('#f-nome') ? $('#f-nome').value.trim() : '';
     const qcP = $('#qc-preco'), qcQ = $('#qc-qtd'), qcC = $('#qc-cbm'), qcM = $('#qc-moeda');
@@ -1546,12 +1565,18 @@
         status: 'novo', notas: [],
         criado: Date.now(), atualizado: Date.now()
       };
-      // lembra o estande para o próximo produto do mesmo fornecedor
+      // lembra o estande para o próximo produto do mesmo fornecedor, aqui e na captura
       cfg.ultimoForn = { forn, contato, estande: p.estande, fase: p.fase };
       DB.setCfg('ultimoForn', cfg.ultimoForn);
+      if ($('#f-forn')) {
+        $('#f-forn').value = forn;
+        $('#f-contato').value = $('#s-contato').value.trim();
+        $('#f-estande').value = p.estande;
+        $('#f-fase').value = p.fase;
+      }
 
       const midias = pendentes.map(m => ({ id: m.id, produtoId: id, blob: m.blob, tipo: m.tipo, nome: m.nome,
-        cartao: !!m.cartao, audio: !!m.audio }));
+        cartao: !!m.cartao, audio: !!m.audio, placa: !!m.placa }));
       miniaturaDe(midias)
         .then(mini => { if (mini) p.miniatura = mini; return DB.salvarProduto(p); })
         .then(() => Promise.all(midias.map(m => DB.salvarMidia(m))))
@@ -1973,7 +1998,7 @@
           ${linha(temModelo, 'Reconhecimento por foto', temModelo
             ? 'modelo de visão gravado — a foto é classificada no aparelho'
             : 'modelo NÃO baixado — a foto não vai ser reconhecida')}
-          ${fotos ? linha(!fotos.perdidas, 'Fotos, cartões e áudios', fotos.perdidas
+          ${fotos ? linha(!fotos.perdidas, 'Fotos, cartões, placas e áudios', fotos.perdidas
             ? fotos.boas + ' abrem, ' + fotos.perdidas + ' o iPhone perdeu (gravadas até a v20)'
             : fotos.boas + ' guardados, todos abrem') : ''}
           ${linha(persistido, 'Armazenamento persistente', persistido
@@ -2028,11 +2053,11 @@
 
   /* Foto inteira não viaja (é 95% do peso), mas sem foto nenhuma o produto
      dos outros vira só um nome na lista. Vai uma miniatura de ~20 KB dentro
-     do produto, feita da primeira foto que não é o cartão. */
+     do produto, feita da primeira foto que não é o cartão nem a placa. */
   function prepararMiniaturas() {
     const faltam = produtos.filter(p => !p.miniatura && !p.autor);
     return faltam.reduce((fila, p) => fila.then(() => DB.midiasDe(p.id).then(ms => {
-      const foto = ms.find(m => (m.tipo || '').startsWith('image') && !m.cartao);
+      const foto = ms.find(fotoDoProduto);
       if (!foto) return;
       return imagemReduzida(foto.blob, 320, 0.6).then(url => {
         if (!url) return;
@@ -2161,7 +2186,8 @@
         fr.readAsDataURL(b);
       });
       return Promise.all(ms.map(m => lerB64(m.blob).then(d => ({
-        id: m.id, produtoId: m.produtoId, tipo: m.tipo, nome: m.nome, dados: d
+        id: m.id, produtoId: m.produtoId, tipo: m.tipo, nome: m.nome, dados: d,
+        cartao: !!m.cartao, audio: !!m.audio, placa: !!m.placa
       }))));
     }).then(midias => {
       const pacote = { app: 'canton-scout', versao: 1, exportado: new Date().toISOString(), cfg, produtos, midias };
@@ -2206,7 +2232,8 @@
       const b64Blob = (dataUrl) => fetch(dataUrl).then(r => r.blob());
       Promise.all((d.produtos || []).map(p => DB.salvarProduto(p)))
         .then(() => Promise.all((d.midias || []).map(m => b64Blob(m.dados).then(b =>
-          DB.salvarMidia({ id: m.id, produtoId: m.produtoId, blob: b, tipo: m.tipo, nome: m.nome })))))
+          DB.salvarMidia({ id: m.id, produtoId: m.produtoId, blob: b, tipo: m.tipo, nome: m.nome,
+            cartao: !!m.cartao, audio: !!m.audio, placa: !!m.placa })))))
         .then(() => DB.listarProdutos())
         .then(ps => { produtos = ps; atualizaContador(); renderProdutos(); toast('Backup importado: ' + ps.length + ' produtos'); });
     };
@@ -2266,7 +2293,6 @@
         }
         pintarConfig(); ligarConfig();
         atualizaContador();      // de novo: só agora o código da viagem foi lido
-        $('#ctn-hist').hidden = !(cfg.conteineres || []).length;
         // fotos gravadas até a v20 viram bytes; as que o iPhone já perdeu são marcadas
         DB.migrarMidias().then(r => {
           if (r.convertidas || r.perdidas) renderProdutos();
@@ -2289,8 +2315,7 @@
     $('#gal').onchange = (e) => { receberArquivos(e.target.files); e.target.value = ''; };
     $('#cartao').onchange = (e) => { receberCartao(e.target.files[0]); e.target.value = ''; };
     $('#btn-audio').onclick = alternarGravacao;
-    $('#container-foto').onchange = (e) => { receberContainer(e.target.files[0]); e.target.value = ''; };
-    $('#ctn-hist').onclick = () => mostrarContainers(null);
+    $('#placa').onchange = (e) => { receberPlaca(e.target.files[0]); e.target.value = ''; };
     $('#count-pill').onclick = abrirSync;
     $('#btn-salvar').onclick = salvarProduto;
     $$('#f-nota button').forEach(b => b.onclick = () => {
