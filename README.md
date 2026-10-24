@@ -49,6 +49,11 @@ inglês sobre os 10.516 códigos, com os candidatos ranqueados.
 - **Capturar** — foto pela câmera nativa, preço FOB, MOQ, peso, CBM, estande,
   WeChat do fornecedor. Salva na hora, sem rede. As fotos são reduzidas para
   1280 px antes de gravar, senão 50 produtos encheriam o celular.
+  **Foto do cartão** do fornecedor (vale como contato) e **áudio** falando
+  preço e detalhes: os dois ficam no produto mesmo sem rede. Com internet, a
+  IA lê o cartão (fabricante, WeChat, telefone, estande) e transcreve o áudio
+  (preço, MOQ, detalhes) direto nos campos. Sem rede, dá para ler depois no
+  produto, pelos botões "Ler cartão" e "Transcrever áudio".
 - **Produtos** — lista com o selo de risco e o custo por peça já calculado.
   Ordena por pior risco ou menor custo. Exporta backup (.json, com as fotos)
   e planilha (.csv, abre no Excel).
@@ -57,6 +62,26 @@ inglês sobre os 10.516 códigos, com os candidatos ranqueados.
 - **Custos** — extrato linha a linha, com a base de cálculo de cada tributo.
 - **Config** — câmbio, UF/ICMS, regime tributário, modal, frete, despesas.
   E o **teste de modo offline**.
+
+## Sincronização entre os celulares
+
+Mesmo **código da viagem** em Config nos três celulares (maiúscula e espaço
+não importam) e o nome de quem usa cada um. Com internet, cada celular compara
+a lista do servidor (Supabase, tabela `canton_produtos`) com a dele e troca o
+que falta — inclusive o que foi cadastrado sem sinal e enviado horas depois.
+Viajam os dados e uma miniatura de cada produto; as fotos inteiras, o cartão e
+o áudio ficam no celular de quem cadastrou (vão pelo backup/AirDrop). Apagar
+um produto que você cadastrou some dos três; o de outra pessoa sai só do seu.
+Sem código, o topo mostra **sem sync** e nada sai do aparelho.
+
+## Leitura do cartão e do áudio (IA)
+
+O app chama o fluxo **Canton Scout - Ler Cartão e Áudio** no n8n da Heusi
+(`/webhook/canton-scout-ia`), que guarda a chave da OpenAI — a chave nunca vai
+para o celular nem para este repositório. Cartão: GPT-4o com visão. Áudio:
+Whisper transcreve e o GPT-4o mini separa preço, MOQ e detalhes. O fluxo só
+atende quem manda o código da viagem certo; **se trocarem o código, troque
+também no nó "Conferir e Preparar"** do fluxo.
 
 ## Antes de embarcar — faça nesta ordem
 
