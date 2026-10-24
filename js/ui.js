@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v20 · 24/10/2026 · sync';
+  const VERSAO = 'v21 · 24/10/2026 · fotos';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -83,7 +83,9 @@
         c.getContext('2d').drawImage(fonte, 0, 0, w, h);
         c.toBlob(b => ok(b && b.size < file.size ? b : file), 'image/jpeg', Q);
       };
-      if (bmp) { desenhar(bmp, bmp.width, bmp.height); return; }
+      // uma foto de 12 MP decodificada ocupa ~48 MB: no iPhone, sem soltar,
+      // algumas fotos seguidas esgotam a memória do app
+      if (bmp) { desenhar(bmp, bmp.width, bmp.height); if (bmp.close) bmp.close(); return; }
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => { URL.revokeObjectURL(url); desenhar(img, img.width, img.height); };
@@ -104,7 +106,7 @@
         c.getContext('2d').drawImage(fonte, 0, 0, c.width, c.height);
         try { ok(c.toDataURL('image/jpeg', q)); } catch (e) { ok(null); }
       };
-      if (bmp) { desenhar(bmp, bmp.width, bmp.height); return; }
+      if (bmp) { desenhar(bmp, bmp.width, bmp.height); if (bmp.close) bmp.close(); return; }
       const img = new Image();
       const url = URL.createObjectURL(blob);
       img.onload = () => { URL.revokeObjectURL(url); desenhar(img, img.width, img.height); };
@@ -118,6 +120,24 @@
      de volta o que ele mesmo cadastrou (app reinstalado, por exemplo). */
   const mesmoNome = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
   const ehMeu = (p) => !p.autor || mesmoNome(p.autor, cfg.dispositivo);
+
+  /* miniatura feita na hora de salvar, da foto que ainda está na memória:
+     fica dentro do produto e sincroniza, mesmo que o iPhone perca a foto */
+  function miniaturaDe(midias) {
+    const foto = midias.find(m => (m.tipo || '').startsWith('image') && !m.cartao);
+    return foto ? imagemReduzida(foto.blob, 320, 0.6).catch(() => null) : Promise.resolve(null);
+  }
+
+  /* imagem que não abre vira a miniatura, e sem miniatura um espaço
+     vazio com ícone de câmera — nunca o "?" do iPhone */
+  function semFoto(img, p) {
+    img.onerror = () => {
+      if (p && p.miniatura && img.getAttribute('src') !== p.miniatura) { img.src = p.miniatura; return; }
+      img.onerror = null;
+      img.removeAttribute('src');
+      img.classList.add('sem-foto');
+    };
+  }
   const nomeAutor = (p) => p.autor === 'sem nome' ? 'outro celular' : p.autor;
 
   function blobUrl(id, blob) {
@@ -527,7 +547,8 @@
     };
     const midias = pendentes.map(m => ({ id: m.id, produtoId: id, blob: m.blob, tipo: m.tipo, nome: m.nome,
       cartao: !!m.cartao, audio: !!m.audio }));
-    DB.salvarProduto(p)
+    miniaturaDe(midias)
+      .then(mini => { if (mini) p.miniatura = mini; return DB.salvarProduto(p); })
       .then(() => Promise.all(midias.map(m => DB.salvarMidia(m))))
       .then(() => {
         produtos.push(p);
@@ -659,8 +680,11 @@
       const foto = ms.find(m => (m.tipo || '').startsWith('image') && !m.cartao)
         || ms.find(m => (m.tipo || '').startsWith('image'));
       // produto de outro celular não tem a foto aqui: vem a miniatura
-      if (img && foto) img.src = blobUrl(foto.id, foto.blob);
-      else if (img && p.miniatura) img.src = p.miniatura;
+      if (!img) return;
+      semFoto(img, p);
+      if (foto) img.src = blobUrl(foto.id, foto.blob);
+      else if (p.miniatura) img.src = p.miniatura;
+      else img.classList.add('sem-foto');
     }));
     el.querySelectorAll('[data-abrir]').forEach(c => c.onclick = () => abrirProduto(c.dataset.abrir));
     // a estrela não abre o produto: favoritar tem que ser um toque só
@@ -791,6 +815,7 @@
           <button class="ghost danger" id="m-apagar">Apagar produto</button>
         </div>`);
       /* ---- situação, categoria e notas ---- */
+      $('#modal-body').querySelectorAll('.thumbs img').forEach(i => semFoto(i, p));
       const salvar = () => { p.atualizado = Date.now(); agendarSync(); return DB.salvarProduto(p); };
       /* ---- leitura que ficou para depois (sem internet no pavilhão) ---- */
       const podeLer = () => {
@@ -1427,7 +1452,8 @@
 
       const midias = pendentes.map(m => ({ id: m.id, produtoId: id, blob: m.blob, tipo: m.tipo, nome: m.nome,
         cartao: !!m.cartao, audio: !!m.audio }));
-      DB.salvarProduto(p)
+      miniaturaDe(midias)
+        .then(mini => { if (mini) p.miniatura = mini; return DB.salvarProduto(p); })
         .then(() => Promise.all(midias.map(m => DB.salvarMidia(m))))
         .then(() => {
           produtos.push(p);
@@ -1829,8 +1855,9 @@
       // o modelo de visão é o pedaço mais pesado: confirma que baixou
       caches.keys().then(ks => ks.length
         ? caches.open(ks[0]).then(c => c.match('modelo/group1-shard4of4')).then(m => !!m)
-        : false).catch(() => false)
-    ]).then(([reg, estado, chaves, persistido, esp, temModelo]) => {
+        : false).catch(() => false),
+      DB.saudeMidias().catch(() => null)
+    ]).then(([reg, estado, chaves, persistido, esp, temModelo, fotos]) => {
       const temSw = !!(reg && reg.active);
       const nCache = estado ? estado.total : chaves.length;
       const esperado = estado ? estado.esperado : 24;
@@ -1846,6 +1873,9 @@
           ${linha(temModelo, 'Reconhecimento por foto', temModelo
             ? 'modelo de visão gravado — a foto é classificada no aparelho'
             : 'modelo NÃO baixado — a foto não vai ser reconhecida')}
+          ${fotos ? linha(!fotos.perdidas, 'Fotos, cartões e áudios', fotos.perdidas
+            ? fotos.boas + ' abrem, ' + fotos.perdidas + ' o iPhone perdeu (gravadas até a v20)'
+            : fotos.boas + ' guardados, todos abrem') : ''}
           ${linha(persistido, 'Armazenamento persistente', persistido
             ? 'o navegador não vai apagar suas fotos'
             : 'o navegador pode apagar os dados se faltar espaço — instale o app na tela inicial')}
@@ -2136,6 +2166,12 @@
         }
         pintarConfig(); ligarConfig();
         atualizaContador();      // de novo: só agora o código da viagem foi lido
+        // fotos gravadas até a v20 viram bytes; as que o iPhone já perdeu são marcadas
+        DB.migrarMidias().then(r => {
+          if (r.convertidas || r.perdidas) renderProdutos();
+          if (r.perdidas) toast(r.perdidas + (r.perdidas > 1 ? ' fotos antigas não abrem mais' : ' foto antiga não abre mais')
+            + ' — o resto do cadastro está salvo');
+        }).catch(() => {});
         buscarNcm();
         $('#splash').classList.add('off');
         setTimeout(() => $('#splash').remove(), 400);
