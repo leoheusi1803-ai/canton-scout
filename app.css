@@ -88,6 +88,12 @@ main{padding:16px}
 .f label b{color:var(--bad)}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row .f-sm{max-width:118px}
+/* preço | moeda | unidade, e MOQ | unidade do MOQ | quantidade: rótulos de
+   alturas diferentes não podem desalinhar os campos */
+.row3{grid-template-columns:1fr 84px 112px;align-items:end}
+.row3>.f{margin-bottom:13px}   /* o último não perde a margem: alinhado por baixo, ele desceria */
+.row3.moq{grid-template-columns:.85fr 1.3fr 1fr}
+.f label .un-txt{text-transform:none;letter-spacing:0}
 input,textarea,select{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-sm);
   color:var(--txt);font:inherit;padding:12px 13px;appearance:none;transition:border-color .16s,box-shadow .16s}
 input::placeholder,textarea::placeholder{color:#55688c}
