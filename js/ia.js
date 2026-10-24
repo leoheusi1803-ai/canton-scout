@@ -1,5 +1,6 @@
 /* ============================================================
-   ia.js — leitura do cartão do fornecedor e do áudio, pela IA.
+   ia.js — leitura do cartão do fornecedor, do áudio e do número de
+   contêiner, pela IA.
 
    Só funciona com internet, e nunca é obrigatória: a foto do cartão e o
    áudio ficam gravados no aparelho de qualquer jeito. A IA só poupa a
@@ -53,5 +54,10 @@ const IA = (() => {
     return comoDataUrl(blob).then(audio => chamar({ tipo: 'audio', viagem, audio }));
   }
 
-  return { lerCartao, lerAudio };
+  /* devolve { conteineres: [{ numero, tipo_iso, tara_kg, peso_max_kg, lacre }], observacao } */
+  function lerContainer(blob, viagem) {
+    return comoDataUrl(blob).then(imagem => chamar({ tipo: 'container', viagem, imagem }));
+  }
+
+  return { lerCartao, lerAudio, lerContainer };
 })();

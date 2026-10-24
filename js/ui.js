@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v21 · 24/10/2026 · fotos';
+  const VERSAO = 'v22 · 24/10/2026 · container';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -470,6 +470,106 @@
       avisoIa('Áudio guardado, mas não consegui transcrever', esc(e.message) +
         '. Dá para transcrever depois, no produto.');
     });
+  }
+
+  /* ---------------- número de contêiner ----------------
+     Digitar MSKU1234565 no celular é onde nasce o erro de um caractere.
+     A IA lê a foto (porta, BL, print) e o app confere o dígito
+     verificador da ISO 6346: se não bater, avisa antes de alguém copiar
+     o número errado para o despachante ou para o rastreio.            */
+  const VALOR_ISO = (() => {
+    // A=10, B=12, C=13… pulando os múltiplos de 11
+    const v = {};
+    let n = 10;
+    for (let c = 65; c <= 90; c++) {
+      if (n % 11 === 0) n++;
+      v[String.fromCharCode(c)] = n++;
+    }
+    return v;
+  })();
+
+  function digitoContainer(s10) {
+    let soma = 0;
+    for (let i = 0; i < 10; i++) soma += (/\d/.test(s10[i]) ? +s10[i] : VALOR_ISO[s10[i]]) * Math.pow(2, i);
+    return (soma % 11) % 10;
+  }
+
+  function conferirContainer(numero) {
+    const n = String(numero || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!/^[A-Z]{3}[UJZ]\d{6}\d?$/.test(n))
+      return { n, ok: false, motivo: 'fora do padrão (4 letras e 7 algarismos) — confira na foto' };
+    const esperado = digitoContainer(n.slice(0, 10));
+    if (n.length === 10) return { n, ok: false, motivo: 'faltou o dígito verificador; pela conta é ' + esperado };
+    return +n[10] === esperado ? { n, ok: true }
+      : { n, ok: false, motivo: 'o dígito verificador não confere (pela conta seria ' + esperado + '): algum caractere foi lido errado' };
+  }
+
+  const formatarContainer = (n) => n.length === 11 ? n.slice(0, 4) + ' ' + n.slice(4, 10) + ' ' + n.slice(10) : n;
+
+  function copiar(texto) {
+    const ok = () => toast('Copiado: ' + texto);
+    const velho = () => {
+      const t = document.createElement('textarea');
+      t.value = texto; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select(); t.setSelectionRange(0, texto.length);
+      let feito = false;
+      try { feito = document.execCommand('copy'); } catch (e) { }
+      t.remove();
+      if (feito) ok(); else toast('Não consegui copiar: segure o número para copiar');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(ok, velho);
+    else velho();
+  }
+
+  function guardarContainers(lidos) {
+    const novos = lidos.filter(c => c.n).map(c => ({ n: c.n, ok: c.ok, tipo: c.tipo || '', lacre: c.lacre || '', t: Date.now() }));
+    const resto = (cfg.conteineres || []).filter(h => !novos.some(c => c.n === h.n));
+    cfg.conteineres = novos.concat(resto).slice(0, 20);
+    DB.setCfg('conteineres', cfg.conteineres);
+    $('#ctn-hist').hidden = false;
+  }
+
+  /* lidos = null abre só a lista dos últimos */
+  function mostrarContainers(lidos, observacao) {
+    const cartao = (c) => `<div class="ctn${c.ok ? '' : ' warn'}">
+        <div class="ctn-num">${esc(formatarContainer(c.n))}</div>
+        <div class="ctn-info">${c.ok ? '✓ dígito verificador confere' : '⚠ ' + esc(c.motivo)}
+          ${[c.tipo, c.tara && 'tara ' + c.tara.toLocaleString('pt-BR') + ' kg',
+            c.max && 'máx. ' + c.max.toLocaleString('pt-BR') + ' kg', c.lacre && 'lacre ' + c.lacre]
+            .filter(Boolean).map(x => '<br>' + esc(x)).join('')}</div>
+        <div class="ctn-acoes"><button class="ghost" data-copiar="${esc(c.n)}">Copiar</button>
+          ${navigator.share ? `<button class="ghost" data-partilhar="${esc(c.n)}">Compartilhar</button>` : ''}</div>
+      </div>`;
+    const hist = (cfg.conteineres || []).filter(h => !(lidos || []).some(c => c.n === h.n));
+    const titulo = !lidos ? 'Containers já lidos'
+      : lidos.length > 1 ? 'Containers lidos' : lidos.length ? 'Container lido' : 'Container';
+    modal(`<h3 style="margin-bottom:10px">${titulo}</h3>
+      ${lidos ? (lidos.length ? lidos.map(cartao).join('') : '<p>Não achei número de container na foto.</p>') : ''}
+      ${observacao ? `<p class="hint" style="margin:0 0 12px">${esc(observacao)}</p>` : ''}
+      ${hist.length ? `${lidos ? '<h3 style="margin:16px 0 4px">Últimos lidos</h3>' : ''}` + hist.map(h =>
+        `<div class="ctn-hist"><span>${esc(formatarContainer(h.n))}${h.ok ? '' : '<small>⚠</small>'}</span>
+          <button class="ghost" data-copiar="${esc(h.n)}">Copiar</button></div>`).join('')
+        : (lidos ? '' : '<p class="hint">Nenhum ainda.</p>')}`);
+    $('#modal-body').querySelectorAll('[data-copiar]').forEach(b => b.onclick = () => copiar(b.dataset.copiar));
+    $('#modal-body').querySelectorAll('[data-partilhar]').forEach(b => b.onclick = () =>
+      navigator.share({ text: b.dataset.partilhar }).catch(() => {}));
+  }
+
+  function receberContainer(file) {
+    if (!file) return;
+    if (!SYNC.ativo()) { toast('Preencha o código da viagem em Config para ler containers'); return; }
+    if (!navigator.onLine) { toast('Sem internet agora: a leitura do container precisa de rede'); return; }
+    modal('<h3 style="margin-bottom:8px">Container</h3><p class="hint" style="margin:0">lendo o número…</p>');
+    comprimir(file)
+      .then(b => IA.lerContainer(b, SYNC.codigo()))
+      .then(d => {
+        const lidos = (d.conteineres || []).map(c => Object.assign(conferirContainer(c.numero),
+          { tipo: c.tipo_iso, tara: c.tara_kg, max: c.peso_max_kg, lacre: c.lacre }));
+        guardarContainers(lidos);
+        mostrarContainers(lidos, d.observacao);
+      })
+      .catch(e => modal(`<h3 style="margin-bottom:8px">Container</h3>
+        <p class="hint" style="margin:0">Não consegui ler: ${esc(e.message)}. Tente de novo com a foto mais de perto.</p>`));
   }
 
   /* Versão nova baixada no meio da feira: recarregar com foto ou preço
@@ -2166,6 +2266,7 @@
         }
         pintarConfig(); ligarConfig();
         atualizaContador();      // de novo: só agora o código da viagem foi lido
+        $('#ctn-hist').hidden = !(cfg.conteineres || []).length;
         // fotos gravadas até a v20 viram bytes; as que o iPhone já perdeu são marcadas
         DB.migrarMidias().then(r => {
           if (r.convertidas || r.perdidas) renderProdutos();
@@ -2188,6 +2289,8 @@
     $('#gal').onchange = (e) => { receberArquivos(e.target.files); e.target.value = ''; };
     $('#cartao').onchange = (e) => { receberCartao(e.target.files[0]); e.target.value = ''; };
     $('#btn-audio').onclick = alternarGravacao;
+    $('#container-foto').onchange = (e) => { receberContainer(e.target.files[0]); e.target.value = ''; };
+    $('#ctn-hist').onclick = () => mostrarContainers(null);
     $('#count-pill').onclick = abrirSync;
     $('#btn-salvar').onclick = salvarProduto;
     $$('#f-nota button').forEach(b => b.onclick = () => {
