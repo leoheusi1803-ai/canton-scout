@@ -2,7 +2,7 @@
    sw.js — service worker. É isto que faz o app abrir sem
    internet nenhuma, dentro do pavilhão da feira.
    ============================================================ */
-const CACHE = 'canton-scout-v25';
+const CACHE = 'canton-scout-v26';
 
 /* tudo que precisa estar no aparelho antes de embarcar */
 const ESSENCIAL = [

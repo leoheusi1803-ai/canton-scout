@@ -70,6 +70,12 @@ inglês sobre os 10.516 códigos, com os candidatos ranqueados.
 - **Produtos** — lista com o selo de risco e o custo por peça já calculado.
   Ordena por pior risco ou menor custo. Exporta backup (.json, com as fotos)
   e planilha (.csv, abre no Excel).
+  **✏️ Editar**, no produto salvo: corrige qualquer campo e acrescenta o que
+  faltou no estande — foto da placa, do cartão, do produto ou um áudio — com a
+  IA lendo como na captura (o que ela muda nos campos volta com "↩ desfazer").
+  Também tira foto ou áudio errado (×). Nada muda até "Salvar alterações";
+  sair sem salvar pergunta antes de descartar. Vale para o produto dos outros
+  celulares: os campos sincronizam, as fotos ficam em quem pôs.
 - **NCM** — busca por descrição em **português ou inglês** (os estandes
   atendem em inglês). Mostra II, IPI e o risco de cada candidato.
 - **Custos** — extrato linha a linha, com a base de cálculo de cada tributo.
