@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v25 · 24/10/2026 · unidade e MOQ';
+  const VERSAO = 'v26 · 25/10/2026 · editar produto';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -42,10 +42,21 @@
     clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600);
   }
   function modal(html) {
+    largarEdicao();
     $('#modal-body').innerHTML = html;
     $('#modal').classList.add('on');
   }
-  function fecharModal() { $('#modal').classList.remove('on'); $('#modal-body').innerHTML = ''; }
+  function fecharModal() { largarEdicao(); $('#modal').classList.remove('on'); $('#modal-body').innerHTML = ''; }
+  /* Editando um produto, a placa já lida e o preço corrigido não somem
+     num toque fora da tela: com alteração por salvar, pergunta antes.
+     Saindo da edição por qualquer caminho, larga o áudio pela metade. */
+  let edicao = null;           // { mudou: () => bool, largar: () => void }
+  function largarEdicao() { const e = edicao; edicao = null; if (e) e.largar(); }
+  const DESCARTAR = 'Descartar as alterações deste produto?';
+  function pedirFechar() {
+    if (edicao && edicao.mudou() && !confirm(DESCARTAR)) return;
+    fecharModal();
+  }
 
   const TITULOS = { capturar: 'Capturar', produtos: 'Produtos', ncm: 'Classificação NCM', custos: 'Previsão de custos', config: 'Configuração' };
   function ir(v) {
@@ -162,10 +173,10 @@
   const opcoesUn = (lista) => lista.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
   let moqUnTocado = false;     // a pessoa escolheu a unidade do MOQ: a do preço não passa por cima
 
-  function pintarUnidades() {
-    const u = unDe(null);
-    $$('#v-capturar .un-txt').forEach(el => {
-      el.textContent = el.closest('label').htmlFor === 'f-qtd' ? '(' + (u.id === 'pc' ? 'peças' : u.curto) + ')' : u.nome;
+  function pintarUnidades(raiz, campoUn) {
+    const u = CUSTOS.unidade(($(campoUn || '#f-un') || {}).value || 'pc');
+    $$((raiz || '#v-capturar') + ' .un-txt').forEach(el => {
+      el.textContent = /-qtd$/.test(el.closest('label').htmlFor) ? '(' + (u.id === 'pc' ? 'peças' : u.curto) + ')' : u.nome;
     });
   }
   function escolherUnidade(un, moqUn) {
@@ -389,27 +400,29 @@
 
   const juntar = (a, b) => [String(a || '').trim(), b].filter(Boolean).join('\n');
 
-  function avisoIa(titulo, texto) {
-    $('#ia-res').innerHTML = `<div class="card tight"><b>${titulo}</b>
+  // na captura, ou no formulário de edição (alvo '#e-ia')
+  function avisoIa(titulo, texto, alvo) {
+    $(alvo || '#ia-res').innerHTML = `<div class="card tight"><b>${titulo}</b>
       <p class="hint" style="margin:4px 0 0">${texto}</p></div>`;
   }
 
-  /* pode chamar a IA agora? se não, explica por quê */
+  /* pode chamar a IA agora? se não, explica por quê. Na edição (alvo), o
+     que foi acrescentado só fica no produto ao salvar */
   const GUARDADO = {
-    'Cartão': ['Cartão guardado', 'Ler cartão'],
-    'Áudio': ['Áudio guardado', 'Transcrever áudio'],
-    'Placa': ['Placa guardada', 'Ler placa']
+    'Cartão': ['Cartão guardado', 'Ler cartão', 'Cartão adicionado'],
+    'Áudio': ['Áudio guardado', 'Transcrever áudio', 'Áudio adicionado'],
+    'Placa': ['Placa guardada', 'Ler placa', 'Placa adicionada']
   };
-  function iaDisponivel(oQue) {
-    const [guardado, botao] = GUARDADO[oQue];
+  function iaDisponivel(oQue, alvo) {
+    const [guardado, botao, posto] = GUARDADO[oQue];
+    const titulo = alvo ? posto + ' · vai junto ao salvar' : guardado + ' no produto';
     if (!SYNC.ativo()) {
-      avisoIa(guardado + ' no produto',
-        'Para a IA ler, preencha o <b>código da viagem</b> em Config.');
+      avisoIa(titulo, 'Para a IA ler, preencha o <b>código da viagem</b> em Config.', alvo);
       return false;
     }
     if (!navigator.onLine) {
-      avisoIa(guardado + ' no produto',
-        'Sem internet agora. Depois, abra o produto e toque em <b>' + botao + '</b>.');
+      avisoIa(titulo, 'Sem internet agora. ' + (alvo ? 'Salve assim; depois, abra' : 'Depois, abra')
+        + ' o produto e toque em <b>' + botao + '</b>.', alvo);
       return false;
     }
     return true;
@@ -449,9 +462,11 @@
   /* ---- gravação ----
      Falar é mais rápido que digitar com o fornecedor na frente.     */
   let gravador = null, gravStream = null, gravPedacos = [], gravInicio = 0, gravTimer = null;
+  // quem gravou e para onde vai o áudio: a captura ou a edição de um produto salvo
+  let gravBotao = null, gravFim = null;
 
   function pintarBotaoAudio() {
-    const b = $('#btn-audio');
+    const b = gravBotao || $('#btn-audio');
     if (!b) return;
     const s = Math.floor((Date.now() - gravInicio) / 1000);
     b.classList.toggle('gravando', !!gravador);
@@ -460,15 +475,19 @@
       : 'Gravar áudio<small>fale preço e detalhes</small>';
   }
 
-  function alternarGravacao() {
+  function alternarGravacao(botao, aoTerminar) {
     if (gravador) { gravador.stop(); return; }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
       toast('Este celular não grava áudio pelo app');
       return;
     }
     navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      // saiu da tela (cancelou a edição) enquanto o celular pedia o microfone: não grava às cegas
+      if (botao && !botao.isConnected) { stream.getTracks().forEach(t => t.stop()); return; }
       gravStream = stream;
       gravPedacos = [];
+      gravBotao = botao || $('#btn-audio');
+      gravFim = aoTerminar || receberAudio;
       // iPhone grava em mp4; Android, em webm. A transcrição aceita os dois.
       const tipo = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']
         .find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
@@ -480,7 +499,9 @@
         gravador = null; gravStream = null;
         clearInterval(gravTimer);
         pintarBotaoAudio();
-        if (blob.size) receberAudio(blob);
+        const fim = gravFim;
+        gravBotao = null; gravFim = null;
+        if (blob.size) fim(blob);
       };
       gravador.start();
       gravInicio = Date.now();
@@ -768,7 +789,7 @@
      recarregado. Se não der antes, a versão nova entra ao reabrir.  */
   let versaoNova = false;
   function capturaEmAndamento() {
-    return pendentes.length > 0 ||
+    return pendentes.length > 0 || !!edicao || !!gravador ||
       ['f-nome', 'f-desc', 'f-preco', 'f-obs'].some(id => $('#' + id).value.trim());
   }
   function recarregarSePuder() {
@@ -1039,7 +1060,8 @@
   }
 
   /* ---------------- detalhe do produto ---------------- */
-  function abrirProduto(id) {
+  // topo: vindo da edição, que termina lá embaixo, o produto abre do começo
+  function abrirProduto(id, topo) {
     const p = produtos.find(x => x.id === id);
     if (!p) return;
     DB.midiasDe(id).then(ms => {
@@ -1064,6 +1086,7 @@
         <h1 style="font-size:18px;margin-bottom:4px">${esc(p.nome)}</h1>
         <p class="hint" style="margin:0 0 12px">${esc([p.forn, p.estande && 'estande ' + p.estande, 'Fase ' + p.fase,
           !ehMeu(p) && 'cadastrado por ' + nomeAutor(p)].filter(Boolean).join(' · '))}</p>
+        <button class="ghost" id="m-editar">✏️ Editar · pôr foto da placa, cartão ou áudio</button>
         ${fotos ? `<div class="thumbs">${fotos}</div>` : ''}
         ${cartaoHtml}
         ${sons ? `<div class="sons">${sons}</div>` : ''}
@@ -1118,10 +1141,12 @@
           ${p.ncm ? '<button class="ghost" id="m-custo">Ver previsão de custo</button>' : ''}
           <button class="ghost danger" id="m-apagar">Apagar produto</button>
         </div>`);
+      if (topo) $('#modal .modal-in').scrollTop = 0;
       /* ---- situação, categoria e notas ---- */
       // placa que não abre não vira a miniatura do produto
       $('#modal-body').querySelectorAll('.thumbs img').forEach(i => semFoto(i, i.dataset.placa ? null : p));
       const salvar = () => { p.atualizado = Date.now(); agendarSync(); return DB.salvarProduto(p); };
+      $('#m-editar').onclick = () => editarProduto(p);
       /* ---- leitura que ficou para depois (sem internet no pavilhão) ---- */
       const podeLer = () => {
         if (!SYNC.ativo()) { toast('Preencha o código da viagem em Config'); return false; }
@@ -1288,6 +1313,422 @@
         ligarApagarNota(p);
         renderProdutos();
       });
+    });
+  }
+
+  /* ---------------- editar produto salvo ----------------
+     O que faltou no estande se põe depois: a foto da placa, o cartão, a
+     foto do produto, um áudio — e a IA lê como na captura. Nada muda no
+     produto até "Salvar alterações": a IA preenche os campos, a pessoa
+     confere, e um toque desfaz. As fotos ficam neste celular, como
+     sempre; o que a IA leu delas vai nos campos, e esses sincronizam.  */
+  let edicaoAtual = 0;         // resposta da IA que chega depois de sair da edição não cai em nada
+  const CAMPOS_EDICAO = ['nome', 'desc', 'preco', 'moeda', 'un', 'moq', 'moq-un', 'qtd', 'peso', 'cbm',
+    'forn', 'estande', 'fase', 'contato', 'obs'];
+  const NA_FOTO = 'na foto do cartão';
+  const nomeMidia = (m) => m.audio ? 'o áudio' : m.cartao ? 'a foto do cartão' : m.placa ? 'a foto da placa'
+    : ((m.tipo || '').startsWith('video') ? 'o vídeo' : 'a foto');
+
+  function editarProduto(p0) {
+    const p = produtos.find(x => x.id === p0.id) || p0;   // a sincronização pode ter trocado o objeto
+    DB.midiasDe(p.id).then(existentes => {
+      const temCartaoAqui = existentes.some(m => m.cartao);
+      modal(`
+        <h1 style="font-size:18px;margin:0 0 3px">Editar produto</h1>
+        <p class="hint" style="margin:0 0 12px">${esc(p.nome)} · nada muda até você tocar em <b>Salvar alterações</b>.
+          ${ehMeu(p) ? '' : '<br>Cadastrado por ' + esc(nomeAutor(p)) + ': o que você mudar vai para os três celulares; as fotos que puser ficam neste.'}</p>
+        <div class="e-add">
+          <label class="shoot shoot-alt shoot-mini">
+            <input type="file" id="e-placa" accept="image/*" hidden>
+            <span class="shoot-ico">&#128205;</span>
+            <span class="shoot-txt">Foto da placa do estande<small>preenche o nº do estande</small></span>
+          </label>
+          <div class="shoot-row">
+            <label class="shoot shoot-alt shoot-mini">
+              <input type="file" id="e-cartao" accept="image/*" hidden>
+              <span class="shoot-ico">&#128199;</span>
+              <span class="shoot-txt">Foto do cartão<small>vale como contato</small></span>
+            </label>
+            <button type="button" id="e-audio" class="shoot shoot-alt shoot-mini">
+              <span class="shoot-ico">&#127908;</span>
+              <span class="shoot-txt">Gravar áudio<small>fale preço e detalhes</small></span>
+            </button>
+          </div>
+          <label class="shoot shoot-alt shoot-mini">
+            <input type="file" id="e-foto" accept="image/*,video/*" multiple hidden>
+            <span class="shoot-ico">&#128247;</span>
+            <span class="shoot-txt">Foto do produto<small>da câmera ou da galeria</small></span>
+          </label>
+        </div>
+        <div id="e-thumbs" class="thumbs"></div>
+        <div id="e-ia"></div>
+
+        <div class="f"><label for="e-nome">Produto <b>*</b></label>
+          <input id="e-nome" type="text" autocomplete="off" placeholder="ex.: caneca de cerâmica 400ml"></div>
+        <div class="f"><label for="e-desc">Detalhes que definem a NCM</label>
+          <textarea id="e-desc" rows="2" placeholder="material, função, se é elétrico, voltagem…"></textarea></div>
+        <div class="row row3">
+          <div class="f"><label for="e-preco">Preço FOB</label>
+            <input id="e-preco" type="number" inputmode="decimal" step="0.01" placeholder="0,00"></div>
+          <div class="f"><label for="e-moeda">Moeda</label>
+            <select id="e-moeda"><option>USD</option><option>CNY</option></select></div>
+          <div class="f"><label for="e-un">Por</label>
+            <select id="e-un">${opcoesUn(CUSTOS.UNIDADES)}</select></div>
+        </div>
+        <div class="row row3 moq">
+          <div class="f"><label for="e-moq">MOQ</label>
+            <input id="e-moq" type="number" inputmode="decimal" step="any" placeholder="mínimo"></div>
+          <div class="f"><label for="e-moq-un">Unid. do MOQ</label>
+            <select id="e-moq-un">${opcoesUn(CUSTOS.UNIDADES_MOQ)}</select></div>
+          <div class="f"><label for="e-qtd">Vou pedir <span class="un-txt">(peças)</span></label>
+            <input id="e-qtd" type="number" inputmode="decimal" step="any" placeholder="qtd."></div>
+        </div>
+        <div class="row">
+          <div class="f"><label for="e-peso">Peso por <span class="un-txt">peça</span> (kg)</label>
+            <input id="e-peso" type="number" inputmode="decimal" step="0.001" placeholder="0,000"></div>
+          <div class="f"><label for="e-cbm">CBM por <span class="un-txt">peça</span> (m³)</label>
+            <input id="e-cbm" type="number" inputmode="decimal" step="0.00001" placeholder="0,00000"></div>
+        </div>
+        <div class="f"><label for="e-forn">Fabricante / fornecedor <b>*</b></label>
+          <input id="e-forn" type="text" placeholder="nome da empresa no estande"></div>
+        <div class="row">
+          <div class="f"><label for="e-estande">Nº do estande</label>
+            <input id="e-estande" type="text" placeholder="ex.: 11.2 K23"></div>
+          <div class="f"><label for="e-fase">Fase</label>
+            <select id="e-fase"><option value="2">Fase 2</option><option value="3">Fase 3</option><option value="1">Fase 1</option></select></div>
+        </div>
+        <div class="f"><label for="e-contato">Contato — WeChat, e-mail ou telefone <b>*</b></label>
+          <input id="e-contato" type="text" placeholder="${p.contato === NA_FOTO ? 'está na foto do cartão — ou digite o WeChat' : 'ou tire a foto do cartão, lá em cima'}"></div>
+        <div class="f"><label>Condição</label>
+          <div class="seg" id="e-cond">
+            <button type="button" data-v="novo">Novo</button>
+            <button type="button" data-v="usado">Usado / recond.</button>
+          </div></div>
+        <div class="f"><label for="e-obs">Observações</label>
+          <textarea id="e-obs" rows="2" placeholder="qualidade, amostra prometida, prazo, negociação…"></textarea></div>
+
+        <div id="e-erro"></div>
+        <button class="primary big" id="e-salvar">Salvar alterações</button>
+        <button class="ghost" id="e-cancelar" style="margin-top:8px">Cancelar</button>`);
+      $('#modal .modal-in').scrollTop = 0;
+
+      const minha = ++edicaoAtual;
+      const ativa = () => minha === edicaoAtual && !!$('#e-salvar');
+      const v = (k) => $('#e-' + k).value;
+      let novas = [];                 // acrescentadas agora: só vão para o produto ao salvar
+      const tirar = new Set();        // ids das que saem ao salvar
+      let lendo = 0, avisouLendo = false;
+      let condE = p.cond === 'usado' ? 'usado' : 'novo';
+      let moqUnEscolhido = !!p.moqUn && p.moqUn !== (p.un || 'pc');
+
+      [['nome', p.nome], ['desc', p.desc], ['preco', p.preco], ['moq', p.moq], ['qtd', p.qtd], ['peso', p.peso],
+        ['cbm', p.cbm], ['forn', p.forn], ['estande', p.estande], ['obs', p.obs],
+        // "na foto do cartão" não é contato: o campo fica vazio, e o cartão continua valendo
+        ['contato', p.contato === NA_FOTO ? '' : p.contato]]
+        .forEach(([k, val]) => { $('#e-' + k).value = val || ''; });
+      [['moeda', p.moeda, 'USD'], ['un', p.un, 'pc'], ['moq-un', p.moqUn || p.un, 'pc'], ['fase', p.fase, '2']]
+        .forEach(([k, val, padrao]) => { const s = $('#e-' + k); s.value = val || padrao; if (!s.value) s.value = padrao; });
+      const pintarCond = () => $$('#e-cond button').forEach(b => b.classList.toggle('on', b.dataset.v === condE));
+      $$('#e-cond button').forEach(b => b.onclick = () => { condE = b.dataset.v; pintarCond(); });
+      pintarCond();
+      const pintarUn = () => pintarUnidades('#modal-body', '#e-un');
+      pintarUn();
+      $('#e-un').onchange = () => { if (!moqUnEscolhido) $('#e-moq-un').value = v('un'); pintarUn(); };
+      $('#e-moq-un').onchange = () => { moqUnEscolhido = true; };
+
+      const estado = () => JSON.stringify(CAMPOS_EDICAO.map(v).concat(condE));
+      const inicial = estado();
+      const mudou = () => novas.length > 0 || tirar.size > 0 || estado() !== inicial;
+
+      /* ---- fotos e áudio: os de antes e os novos, todos com × ---- */
+      // a miniatura saiu da primeira foto do produto; sem foto aqui, ela veio do outro celular
+      const origem = existentes.find(fotoDoProduto);
+      function pintarMidias() {
+        const lista = existentes.filter(m => !tirar.has(m.id)).concat(novas);
+        const el = $('#e-thumbs');
+        el.innerHTML = (p.miniatura && !origem ? `<div class="thumb"><img src="${esc(p.miniatura)}" alt="">
+            <span class="vid">${ehMeu(p) ? 'miniatura' : 'de ' + esc(nomeAutor(p))}</span></div>` : '')
+          + lista.map(m => {
+            const u = blobUrl(m.id, m.blob);
+            let corpo, toque = '';
+            if (m.audio) {
+              corpo = '<div class="aud">🎤</div><span class="vid">▶ ouvir</span>';
+              toque = ` data-e-ouvir="${m.id}"`;
+            } else if ((m.tipo || '').startsWith('video')) {
+              corpo = `<video src="${u}" muted playsinline></video><span class="vid">▶ vídeo</span>`;
+            } else {
+              corpo = `<img src="${u}" alt="">` + (m.cartao ? '<span class="vid">📇 cartão</span>'
+                : m.placa ? '<span class="vid">📍 placa</span>' : '');
+            }
+            return `<div class="thumb"${toque}>${corpo}<b data-e-rm="${m.id}">×</b></div>`;
+          }).join('');
+        el.querySelectorAll('[data-e-rm]').forEach(b => b.onclick = (ev) => {
+          ev.stopPropagation();
+          const id = b.dataset.eRm;
+          const velha = existentes.find(m => m.id === id);
+          // a que já estava salva sai de vez ao salvar: pergunta, que o × é pequeno
+          if (velha && !confirm('Tirar ' + nomeMidia(velha) + ' do produto? Sai quando você salvar.')) return;
+          if (velha) tirar.add(id); else novas = novas.filter(m => m.id !== id);
+          pintarMidias();
+        });
+        el.querySelectorAll('[data-e-ouvir]').forEach(d => d.onclick = () => {
+          const m = existentes.concat(novas).find(x => x.id === d.dataset.eOuvir);
+          if (m) new Audio(blobUrl(m.id, m.blob)).play().catch(() => {});
+        });
+      }
+      pintarMidias();
+
+      const acrescentar = (file, marca) => comprimir(file).then(b => {
+        if (!ativa()) return null;
+        const m = Object.assign({ id: DB.novoId(), blob: b, tipo: b.type || file.type || '', nome: file.name }, marca);
+        novas.push(m);
+        pintarMidias();
+        return m;
+      });
+
+      /* ---- a IA preenche; o que ela mudou volta com um toque ---- */
+      const instantaneo = () => ({ campos: CAMPOS_EDICAO.map(v), moqUnEscolhido });
+      const restaurar = (s) => {
+        CAMPOS_EDICAO.forEach((k, i) => { $('#e-' + k).value = s.campos[i]; });
+        moqUnEscolhido = s.moqUnEscolhido;
+        pintarUn();
+      };
+      const DESFAZER = ' <button type="button" class="link" id="e-desfazer">↩ desfazer</button>';
+      const ligarDesfazer = (s, resto) => {
+        const b = $('#e-desfazer');
+        if (b) b.onclick = () => { restaurar(s); avisoIa('Voltei o que estava antes', resto, '#e-ia'); };
+      };
+      function lerComIa(msg, chamada, aplicar, erroTitulo, erroDica, resto) {
+        lendo++; avisouLendo = false;
+        avisoIa(msg, 'pode continuar editando', '#e-ia');
+        chamada.then(d => {
+          if (!ativa()) return;
+          const antes = instantaneo();
+          const r = aplicar(d, antes);
+          const trocou = JSON.stringify(instantaneo()) !== JSON.stringify(antes);
+          avisoIa(r.titulo, r.texto + (trocou ? DESFAZER : ''), '#e-ia');
+          ligarDesfazer(antes, resto);
+          if (r.ligar) r.ligar();
+        }).catch(e => {
+          if (ativa()) avisoIa(erroTitulo, esc(e.message) + '. ' + erroDica, '#e-ia');
+        }).then(() => {
+          lendo--;
+          const aviso = $('#e-lendo');
+          if (!lendo && aviso && ativa()) aviso.remove();
+        });
+      }
+      const escolherUnE = (un, moqUn) => {
+        if (un) $('#e-un').value = un;
+        if (moqUn) { $('#e-moq-un').value = moqUn; moqUnEscolhido = true; }
+        else if (un && !moqUnEscolhido) $('#e-moq-un').value = un;
+        pintarUn();
+      };
+
+      // placa: o número do estande; o nome da empresa só entra sozinho se o campo está vazio
+      $('#e-placa').onchange = (ev) => {
+        const f = ev.target.files[0]; ev.target.value = '';
+        if (!f) return;
+        acrescentar(f, { placa: true }).then(m => {
+          if (!m || !iaDisponivel('Placa', '#e-ia')) return;
+          lerComIa('Lendo a placa…', IA.lerEstande(m.blob, SYNC.codigo()), (d, antes) => {
+            const c = camposDaPlaca(d);
+            const forn = v('forn').trim();
+            const linhas = [];
+            let outro = false;
+            if (c.estande) $('#e-estande').value = c.estande;
+            if (c.forn && !forn) $('#e-forn').value = c.forn;
+            else if (c.forn && !mesmaEmpresa(c.forn, forn)) outro = true;
+            if (c.forn && !outro) linhas.push(esc(c.forn));
+            if (outro) linhas.push('A placa diz <b>' + esc(c.forn) + '</b>, e o fabricante salvo é <b>' + esc(forn) + '</b>. '
+              + '<button type="button" class="link" id="e-usar-forn">usar o da placa</button>');
+            linhas.push(c.estande ? 'Confira o número antes de salvar.'
+              : (c.obs ? esc(c.obs) + '<br>' : '') + 'Digite o número, ou tire outra foto mais de perto.');
+            return {
+              titulo: c.estande ? 'Li a placa: estande ' + esc(c.estande)
+                : c.forn ? 'Li a placa, mas não o número do estande' : 'Não achei o número do estande na foto',
+              texto: linhas.join('<br>'),
+              ligar: () => {
+                const b = $('#e-usar-forn');
+                if (b) b.onclick = () => {
+                  $('#e-forn').value = c.forn;
+                  avisoIa('Fabricante: ' + esc(c.forn), 'Era <b>' + esc(forn) + '</b>. Se é outro fornecedor, '
+                    + 'o contato também é outro: confira.' + DESFAZER, '#e-ia');
+                  ligarDesfazer(antes, 'A foto da placa continua aqui.');
+                };
+              }
+            };
+          }, 'Placa adicionada, mas não consegui ler', 'Digite o número do estande, ou leia depois, no produto.',
+          'A foto da placa continua aqui.');
+        });
+      };
+
+      // cartão: é do fornecedor deste produto, então o fabricante e o contato saem dele
+      $('#e-cartao').onchange = (ev) => {
+        const f = ev.target.files[0]; ev.target.value = '';
+        if (!f) return;
+        acrescentar(f, { cartao: true }).then(m => {
+          if (!m || !iaDisponivel('Cartão', '#e-ia')) return;
+          lerComIa('Lendo o cartão…', IA.lerCartao(m.blob, SYNC.codigo()), (d) => {
+            const c = camposDoCartao(d);
+            const feito = [];
+            if (c.forn) { $('#e-forn').value = c.forn; feito.push('fabricante'); }
+            if (c.contato) { $('#e-contato').value = c.contato; feito.push('contato'); }
+            if (c.estande && !v('estande').trim()) { $('#e-estande').value = c.estande; feito.push('estande'); }
+            if (c.obs && !v('obs').includes(c.obs)) $('#e-obs').value = juntar(v('obs'), c.obs);
+            return feito.length
+              ? { titulo: 'Li o cartão', texto: esc([c.forn, c.contato].filter(Boolean).join(' — ')) + '<br>Confira antes de salvar.' }
+              : { titulo: 'Não achei dados no cartão', texto: 'A foto continua valendo como contato.' };
+          }, 'Cartão adicionado, mas não consegui ler', 'A foto vale como contato; dá para ler depois, no produto.',
+          'A foto do cartão continua aqui.');
+        });
+      };
+
+      $('#e-foto').onchange = (ev) => {
+        const fs = Array.from(ev.target.files || []); ev.target.value = '';
+        fs.reduce((fila, f) => fila.then(() => acrescentar(f, {})), Promise.resolve())
+          .then(() => { if (fs.length && ativa()) toast(fs.length + (fs.length > 1 ? ' arquivos adicionados' : ' arquivo adicionado')); });
+      };
+
+      // áudio: o que a pessoa falou corrige preço, MOQ e unidade; o nome escrito fica
+      const aoGravar = (blob) => {
+        if (!ativa()) return;
+        const m = { id: DB.novoId(), blob, tipo: blob.type, nome: 'audio', audio: true };
+        novas.push(m);
+        pintarMidias();
+        if (!iaDisponivel('Áudio', '#e-ia')) return;
+        lerComIa('Ouvindo o áudio…', IA.lerAudio(blob, SYNC.codigo()), (d) => {
+          const c = camposDoAudio(d);
+          const feito = [];
+          if (c.nome && !v('nome').trim()) { $('#e-nome').value = c.nome; feito.push('produto'); }
+          if (c.desc && !v('desc').includes(c.desc)) { $('#e-desc').value = juntar(v('desc'), c.desc); feito.push('detalhes'); }
+          if (c.preco) { $('#e-preco').value = c.preco; feito.push('preço'); }
+          if (c.moeda) $('#e-moeda').value = c.moeda;
+          if (c.un || c.moqUn) { escolherUnE(c.un, c.moqUn); feito.push('unidade'); }
+          if (c.moq) { $('#e-moq').value = c.moq; feito.push('MOQ'); }
+          if (c.qtd) { $('#e-qtd').value = c.qtd; feito.push('quantidade'); }
+          if (c.peso) { $('#e-peso').value = c.peso; feito.push('peso'); }
+          if (c.cbm) { $('#e-cbm').value = c.cbm; feito.push('CBM'); }
+          if (c.obs && !v('obs').includes(c.obs)) { $('#e-obs').value = juntar(v('obs'), c.obs); feito.push('observações'); }
+          return {
+            titulo: feito.length ? 'Preenchi pelo áudio: ' + feito.join(', ') : 'Ouvi, mas não achei preço nem detalhes',
+            texto: (d.transcricao ? '“' + esc(d.transcricao) + '”<br>' : '') + 'Confira os campos antes de salvar.'
+          };
+        }, 'Áudio adicionado, mas não consegui transcrever', 'Dá para transcrever depois, no produto.',
+        'O áudio continua aqui.');
+      };
+      $('#e-audio').onclick = () => alternarGravacao($('#e-audio'), aoGravar);
+
+      // sair é por Cancelar ou tocando fora, e os dois perguntam se houver alteração
+      $('#modal-x').hidden = true;
+      edicao = {
+        mudou,
+        largar: () => {
+          edicaoAtual++;
+          $('#modal-x').hidden = false;
+          // gravando na edição: para, e o áudio vai fora junto com o resto
+          if (gravador && gravFim === aoGravar) { gravFim = () => {}; gravador.stop(); }
+        }
+      };
+      $('#e-cancelar').onclick = () => {
+        if (mudou() && !confirm(DESCARTAR)) return;
+        largarEdicao();
+        abrirProduto(p.id, true);
+      };
+
+      $('#e-salvar').onclick = () => {
+        const erro = $('#e-erro');
+        if (gravador && gravFim === aoGravar) {
+          erro.innerHTML = `<div class="alerta warn" style="margin-bottom:10px"><b>Ainda gravando</b>
+            Toque em <b>Parar</b> no botão do áudio antes de salvar.</div>`;
+          return;
+        }
+        if (lendo && !avisouLendo) {
+          avisouLendo = true;
+          erro.innerHTML = `<div class="alerta warn" id="e-lendo" style="margin-bottom:10px"><b>A IA ainda está lendo</b>
+            Espere uns segundos para ela preencher os campos, ou toque em Salvar de novo para salvar assim.</div>`;
+          return;
+        }
+        if (!mudou()) { largarEdicao(); toast('Nada mudou'); abrirProduto(p.id, true); return; }
+        const nome = v('nome').trim(), forn = v('forn').trim();
+        const temCartao = existentes.some(m => m.cartao && !tirar.has(m.id)) || novas.some(m => m.cartao)
+          // o cartão ficou no celular de quem cadastrou
+          || (p.contato === NA_FOTO && !temCartaoAqui);
+        const contato = v('contato').trim() || (temCartao ? NA_FOTO : '');
+        const faltou = [];
+        if (!nome) faltou.push('produto');
+        if (!forn) faltou.push('fabricante');
+        if (!contato) faltou.push('contato');
+        if (faltou.length) {
+          erro.innerHTML = `<div class="alerta bad" style="margin-bottom:10px">
+            <b>Faltou preencher: ${faltou.join(', ')}</b>
+            O contato do fabricante é o que você não consegue recuperar depois —
+            sem ele a foto não vale nada. Uma foto do cartão também vale.</div>`;
+          try { erro.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { }
+          return;
+        }
+        erro.innerHTML = '';
+        $('#e-salvar').disabled = true;
+        const atual = produtos.find(x => x.id === p.id) || p;
+        const novo = Object.assign({}, atual, {
+          nome, forn, contato,
+          desc: v('desc').trim(),
+          preco: parseFloat(v('preco')) || 0,
+          moeda: v('moeda'),
+          un: v('un'),
+          moq: parseFloat(v('moq')) || 0,
+          moqUn: v('moq-un'),
+          qtd: parseFloat(v('qtd')) || 0,
+          peso: parseFloat(v('peso')) || 0,
+          cbm: parseFloat(v('cbm')) || 0,
+          estande: v('estande').trim(),
+          fase: v('fase'),
+          cond: condE,
+          obs: v('obs').trim(),
+          atualizado: Date.now()
+        });
+        // a miniatura é o que os outros celulares veem: refaz se faltava ou se a foto dela saiu
+        const fotos = existentes.filter(m => !tirar.has(m.id)).concat(novas).filter(fotoDoProduto);
+        const semOrigem = !!origem && tirar.has(origem.id);
+        const midias = novas.map(m => ({ id: m.id, produtoId: novo.id, blob: m.blob, tipo: m.tipo, nome: m.nome,
+          cartao: !!m.cartao, audio: !!m.audio, placa: !!m.placa }));
+        (fotos.length && (!novo.miniatura || semOrigem) ? imagemReduzida(fotos[0].blob, 320, 0.6).catch(() => null)
+          : Promise.resolve(null))
+          .then(mini => {
+            if (mini) novo.miniatura = mini;
+            else if (semOrigem) delete novo.miniatura;
+            return DB.salvarProduto(novo);
+          })
+          .then(() => Promise.all(midias.map(m => DB.salvarMidia(m))))
+          .then(() => Promise.all(Array.from(tirar).map(id => DB.apagarMidia(id))))
+          .then(() => {
+            const i = produtos.indexOf(atual);
+            if (i >= 0) produtos[i] = novo; else produtos.push(novo);
+            // o próximo produto do mesmo estande já sai com o que foi corrigido aqui
+            const mesmoForn = (o) => ['forn', 'contato', 'estande'].every(k => (o[k] || '').trim() === (atual[k] || '').trim());
+            if (cfg.ultimoForn && mesmoForn(cfg.ultimoForn)) {
+              if (mesmoForn({ forn: $('#f-forn').value, contato: $('#f-contato').value, estande: $('#f-estande').value })) {
+                $('#f-forn').value = novo.forn;
+                $('#f-contato').value = v('contato').trim();
+                $('#f-estande').value = novo.estande;
+                $('#f-fase').value = novo.fase;
+              }
+              cfg.ultimoForn = { forn: novo.forn, contato: novo.contato, estande: novo.estande, fase: novo.fase };
+              DB.setCfg('ultimoForn', cfg.ultimoForn);
+            }
+            largarEdicao();
+            toast('Alterações salvas');
+            renderProdutos(); atualizaContador(); agendarSync();
+            abrirProduto(novo.id, true);
+            recarregarSePuder();
+          })
+          .catch(e => {
+            if (!ativa()) return;
+            $('#e-salvar').disabled = false;
+            erro.innerHTML = `<div class="alerta bad" style="margin-bottom:10px">
+              <b>Não consegui salvar</b>${esc(e.message || e)}<br>
+              Se você está no Safari em aba privada, saia dela: o armazenamento fica bloqueado.</div>`;
+          });
+      };
     });
   }
 
@@ -2565,7 +3006,7 @@
     $('#cam').onchange = (e) => { receberArquivos(e.target.files); e.target.value = ''; };
     $('#gal').onchange = (e) => { receberArquivos(e.target.files); e.target.value = ''; };
     $('#cartao').onchange = (e) => { receberCartao(e.target.files[0]); e.target.value = ''; };
-    $('#btn-audio').onclick = alternarGravacao;
+    $('#btn-audio').onclick = () => alternarGravacao();
     $('#placa').onchange = (e) => { receberPlaca(e.target.files[0]); e.target.value = ''; };
     $('#f-un').innerHTML = opcoesUn(CUSTOS.UNIDADES);
     $('#f-moq-un').innerHTML = opcoesUn(CUSTOS.UNIDADES_MOQ);
@@ -2603,8 +3044,8 @@
     // custos
     $('#c-produto').onchange = renderCustos;
     // modal
-    $('#modal-x').onclick = fecharModal;
-    $('#modal').onclick = (e) => { if (e.target.id === 'modal') fecharModal(); };
+    $('#modal-x').onclick = pedirFechar;
+    $('#modal').onclick = (e) => { if (e.target.id === 'modal') pedirFechar(); };
     // rede
     rede();
     window.addEventListener('online', () => { rede(); agendarSync(1500); });
