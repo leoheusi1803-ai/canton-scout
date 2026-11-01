@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v26 · 25/10/2026 · editar produto';
+  const VERSAO = 'v27 · 01/11/2026 · análise pós-feira';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -58,7 +58,7 @@
     fecharModal();
   }
 
-  const TITULOS = { capturar: 'Capturar', produtos: 'Produtos', ncm: 'Classificação NCM', custos: 'Previsão de custos', config: 'Configuração' };
+  const TITULOS = { capturar: 'Capturar', produtos: 'Produtos', ncm: 'Classificação NCM', custos: 'Previsão de custos', analise: 'Análise pós-feira', config: 'Configuração' };
   function ir(v) {
     $$('.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
     $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
@@ -67,6 +67,12 @@
     if (v === 'produtos') renderProdutos();
     if (v === 'custos') renderSelectCustos();
     if (v === 'ncm' && !$('#m-guiado').hidden) renderGuia();
+    if (v === 'analise') {
+      renderAnalise();
+      // a pesquisa muda no servidor sem versão nova do app: com rede, busca a de agora
+      const an = cfg.analise;
+      if (!an || !an.quando || !temAnalise() || Date.now() - an.quando > ANALISE_VALIDADE) baixarAnalise(false);
+    }
   }
 
   const NIVEL_TAG = { ok: 'tag-ok', warn: 'tag-warn', mid: 'tag-mid', bad: 'tag-bad' };
@@ -1104,6 +1110,7 @@
           ${linhaInfo('Condição', p.cond === 'usado' ? 'usado / recondicionado' : 'novo')}
           ${p.obs ? linhaInfo('Observações', p.obs) : ''}
         </table>
+        ${blocoAnalise(p)}
         <div class="card" style="margin:12px 0 0">
           <h3 style="margin-bottom:9px">Nota de 1 a 10</h3>
           <div class="notas" id="m-nota">
@@ -1147,6 +1154,12 @@
       $('#modal-body').querySelectorAll('.thumbs img').forEach(i => semFoto(i, i.dataset.placa ? null : p));
       const salvar = () => { p.atualizado = Date.now(); agendarSync(); return DB.salvarProduto(p); };
       $('#m-editar').onclick = () => editarProduto(p);
+      if ($('#m-analise')) $('#m-analise').onclick = () => {
+        const a = linhaAna(p);
+        fecharModal();
+        aAba = 'nacionais'; aFoco = (a && a.tipo) || p.id;
+        ir('analise');
+      };
       /* ---- leitura que ficou para depois (sem internet no pavilhão) ---- */
       const podeLer = () => {
         if (!SYNC.ativo()) { toast('Preencha o código da viagem em Config'); return false; }
@@ -2551,6 +2564,351 @@
       </div>`;
   }
 
+  /* ============================================================
+     ANÁLISE PÓS-FEIRA
+     Quatro partes: o que vale a pena (conta com o MOQ cadastrado e o
+     frete do volume do pedido), os destaques, a comparação com o produto
+     nacional igual e o que as fontes dizem sobre a regulação de cada tipo.
+     A pesquisa vem do servidor da viagem e fica guardada no aparelho;
+     a conta é feita aqui, com a Config deste celular.
+     ============================================================ */
+  let aAba = 'vale';             // parte aberta
+  let aQuem = '';                // filtro por quem cadastrou
+  let aFaixa = '';               // filtro por veredito, em "Vale a pena"
+  let aFoco = '';                // tipo aberto a partir do detalhe do produto
+  let baixandoAnalise = null;
+  const ANALISE_VALIDADE = 60 * 60 * 1000;   // com rede, rebaixa a pesquisa depois de 1 hora
+
+  const linhasAna = () => (cfg.analise && cfg.analise.linhas) || {};
+  const temasAna = () => (cfg.analise && cfg.analise.temas) || {};
+  const linhaAna = (p) => linhasAna()[p.id] || null;
+  const temAnalise = () => Object.keys(linhasAna()).length > 0;
+  const quemDe = (p) => (ehMeu(p) ? (cfg.dispositivo || 'este celular') : nomeAutor(p));
+  const usd = (v) => 'US$ ' + (v >= 100 ? Math.round(v).toLocaleString('pt-BR') : n2(v));
+  const brl0 = (v) => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+  const mult = (m) => (isFinite(m) ? m : 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×';
+  const urlOk = (u) => /^https?:\/\//i.test(u || '') ? u : '';
+  const FAIXA_TAG = { otimo: 'tag-ok', bom: 'tag-ok', apertado: 'tag-warn', nao: 'tag-bad' };
+  const pillFaixa = (f) => `<span class="tag ${FAIXA_TAG[f.id]}">${esc(f.nome)}</span>`;
+  /* sem o produto igual à venda no Brasil, a conta usa o mais parecido — e avisa */
+  const aproximado = (a) => !!(a && a.ref && a.ref.conf === 'parecido');
+  const refRotulo = (a) => aproximado(a) ? 'o mais parecido à venda no Brasil' : 'o igual mais barato no Brasil';
+  const tagAprox = (a) => aproximado(a) ? ' <span class="tag tag-warn">comparação aproximada</span>' : '';
+
+  /* "peças", "m²", "conjuntos" — a unidade do produto ou, sem ela, a da pesquisa */
+  function unAna(p, a, n) {
+    const ut = a && a.ref && a.ref.un_txt;            // ["barra", "barras"]: o que o preço quer dizer
+    if (ut && !p.un) return n === 1 ? ut[0] : ut[1];
+    const id = p.un || (a && a.ref && a.ref.un) || 'pc';
+    if (id === 'pc') return n === 1 ? 'peça' : 'peças';
+    if (id === 'cj') return n === 1 ? 'conjunto' : 'conjuntos';
+    return CUSTOS.unidade(id).curto;
+  }
+  const porUn = (p, a) => {
+    const ut = a && a.ref && a.ref.un_txt;
+    if (ut && !p.un) return ut[0];
+    const id = p.un || (a && a.ref && a.ref.un) || 'pc';
+    return id === 'pc' ? 'peça' : (id === 'cj' ? 'conjunto' : CUSTOS.unidade(id).curto);
+  };
+
+  function textoPedido(p, a, r) {
+    const n = Math.round(r.q).toLocaleString('pt-BR');
+    const u = unAna(p, a, r.q);
+    const moq = Math.round(Number(p.moq) || 0).toLocaleString('pt-BR');
+    switch (r.como) {
+      case 'cont': return 'MOQ de 1 contêiner de ' + ANALISE.CT[p.moqUn].nome + ' (≈ ' + n + ' ' + u + ')';
+      case 'moq': return 'MOQ de ' + n + ' ' + u;
+      case 'pista': return 'sem MOQ; o fornecedor falou em ' + n + ' ' + u;
+      case 'qtd': return 'sem MOQ; ' + n + ' ' + u + ', o que vocês vão pedir';
+      case 'vou_pedir': return (Number(p.moq) > 0 ? 'MOQ de ' + moq : 'sem MOQ') + '; ' + n + ' ' + u + ', o que vocês vão pedir';
+      case 'ana': return (a.pedido.nota || 'pedido mínimo') + ' (≈ ' + n + ' ' + u + ')';
+      default: return r.q > 1 ? 'sem MOQ; a menor carga que vale embarcar (1 m³ ≈ ' + n + ' ' + u + ')' : 'sem MOQ; 1 ' + u;
+    }
+  }
+
+  function baixarAnalise(manual) {
+    if (!SYNC.ativo()) { if (manual) toast('Preencha o código da viagem em Config'); return Promise.resolve(false); }
+    if (!navigator.onLine) { if (manual) toast('Sem internet agora'); return Promise.resolve(false); }
+    if (baixandoAnalise) return baixandoAnalise;
+    if (manual) toast('Baixando a análise…');
+    baixandoAnalise = SYNC.lerAnalise().then(rows => {
+      const linhas = {};
+      let temas = {}, meta = {}, tipos = {};
+      rows.forEach(r => {
+        if (r.id === '_temas') temas = r.dados || {};
+        else if (r.id === '_meta') meta = r.dados || {};
+        else if (r.id === '_tipos') tipos = r.dados || {};
+      });
+      // a linha do produto traz o tipo; comparáveis, preço de referência e regulação vêm do tipo
+      rows.forEach(r => {
+        if (r.id.charAt(0) === '_') return;
+        const d = r.dados || {};
+        linhas[r.id] = Object.assign({}, tipos[d.tipo] || {}, d);
+      });
+      cfg.analise = { quando: Date.now(), linhas, temas, meta };
+      return DB.setCfg('analise', cfg.analise).then(() => {
+        if (manual) toast(rows.length ? 'Análise atualizada' : 'Ainda não há análise para esta viagem');
+        renderAnalise();
+        return true;
+      });
+    }).catch(e => { if (manual) toast('Não baixou: ' + e.message); return false; })
+      .then(r => { baixandoAnalise = null; return r; });
+    return baixandoAnalise;
+  }
+
+  // a conta de cada produto da viagem, do filtro de pessoa
+  function contasAna() {
+    return produtos.filter(p => p.status !== 'descartado' && (!aQuem || quemDe(p) === aQuem)).map(p => {
+      const a = linhaAna(p);
+      return { p, a, r: a ? ANALISE.calcular(p, a, cfg) : null };
+    });
+  }
+
+  function renderAnalise() {
+    if (!$('#v-analise')) return;
+    $$('#a-aba button').forEach(b => b.classList.toggle('on', b.dataset.v === aAba));
+    ['vale', 'destaques', 'nacionais', 'regulacao'].forEach(k => { $('#a-' + k).hidden = k !== aAba; });
+    // quem cadastrou: os nomes que aparecem nos produtos da viagem
+    const nomes = Array.from(new Set(produtos.map(quemDe)));
+    $('#a-quem').innerHTML = nomes.length > 1 ? [''].concat(nomes).map(n =>
+      `<span class="chip${aQuem === n ? ' on' : ''}" data-quem="${esc(n)}">${n ? esc(n) : 'Todos'}</span>`).join('') : '';
+    $('#a-quem').querySelectorAll('[data-quem]').forEach(c => c.onclick = () => { aQuem = c.dataset.quem; renderAnalise(); });
+    const an = cfg.analise;
+    $('#a-estado').innerHTML = an && an.quando
+      ? `Pesquisa ${an.meta && an.meta.feito_em ? 'de ' + esc(an.meta.feito_em) + ', ' : ''}baixada em ${dataCurta(an.quando)}.
+         <button type="button" class="link" id="a-baixar">Atualizar</button>`
+      : `Ainda não baixada. <button type="button" class="link" id="a-baixar">Baixar agora</button>`;
+    $('#a-baixar').onclick = () => baixarAnalise(true);
+    ['anaLcl', 'ana20', 'ana40'].forEach(k => { const el = $('#k-' + k); if (el && el !== document.activeElement) el.value = cfg[k]; });
+
+    const el = $('#a-' + aAba);
+    if (!temAnalise()) {
+      el.innerHTML = `<div class="empty">A análise ainda não está neste celular.<br>
+        ${SYNC.ativo() ? 'Com internet, toque em <b>Baixar agora</b>, acima.' : 'Preencha o <b>código da viagem</b> em Config.'}</div>`;
+      return;
+    }
+    ({ vale: renderVale, destaques: renderDestaques, nacionais: renderNacionais, regulacao: renderRegulacao })[aAba](el);
+  }
+
+  /* ---- vale a pena ---- */
+  function itemVale(x) {
+    const { p, a, r } = x;
+    const f = r.faixa, fj = r.faixaJunto;
+    const alvo = f.id === 'apertado' || f.id === 'nao' ? ANALISE.fobPara(p, a, cfg, 1.8) : null;
+    const un = porUn(p, a);
+    const linhas = [
+      `Custo posto no Brasil <b>${brl0(r.custo)}</b> por ${esc(un)} · ${refRotulo(a)} <b>${brl0(r.ref)}</b>${a.ref.loja ? ' (' + esc(a.ref.loja) + ')' : ''}${tagAprox(a)}`,
+      `${esc(textoPedido(p, a, r))} · ${usd(r.pedidoUsd)} · frete ${usd(r.freteUsd)} (${esc(r.freteModo)}), ${usd(r.freteUn)} por ${esc(un)}`
+    ];
+    if (r.aviso) linhas.push(esc(r.aviso));
+    if (a.ref.nota) linhas.push(esc(a.ref.nota));
+    if (fj.min > f.min) linhas.push(`Embarcando junto com outros produtos: ${brl0(r.custoJunto)} (${mult(r.multiploJunto)}, ${esc(fj.nome.toLowerCase())})`);
+    if (alvo && alvo.fob != null) linhas.push(`Para ficar <b>Bom</b>: FOB até ${usd(alvo.fob)} (hoje ${usd(Number(p.preco))}, ${Math.round(alvo.queda * 100)}% a menos)`);
+    else if (alvo) linhas.push('Não fica <b>Bom</b> nem com FOB zero: frete, impostos e despesas já passam do preço do nacional.');
+    if (a.barreira) linhas.push('<span class="warn" style="margin:0">' + esc(a.barreira) + '</span>');
+    return `<div class="it" data-a-abrir="${p.id}">
+      <div class="it-top">
+        <div class="it-b">
+          <div class="it-nome">${esc(p.nome)}</div>
+          <div class="it-sub">${esc([p.forn, quemDe(p), p.nota ? 'nota ' + p.nota : '', usd(Number(p.preco)) + ' FOB'].filter(Boolean).join(' · '))}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="a-mult">${mult(r.multiplo)}</div>
+          ${pillFaixa(f)}
+        </div>
+      </div>
+      <div class="a-linhas">${linhas.map(l => `<p>${l}</p>`).join('')}</div>
+    </div>`;
+  }
+
+  function renderVale(el) {
+    const todas = contasAna();
+    const ok = todas.filter(x => x.r).sort((a, b) => b.r.multiplo - a.r.multiplo);
+    const fora = todas.filter(x => !x.r);
+    const conta = (lista, chave) => ANALISE.FAIXAS.map(f => lista.filter(x => x.r[chave].id === f.id).length);
+    const n = conta(ok, 'faixa'), nj = conta(ok, 'faixaJunto');
+    const lista = aFaixa ? ok.filter(x => x.r.faixa.id === aFaixa) : ok;
+    el.innerHTML = `
+      <div class="kpi a-kpi">
+        ${ANALISE.FAIXAS.map((f, i) => `<div><div class="k-l">${esc(f.nome)}</div><div class="k-v">${n[i]}</div>
+          <div class="k-s">${f.min ? 'preço nacional ' + mult(f.min) + ' o custo ou mais' : 'abaixo de ' + mult(ANALISE.FAIXAS[2].min)}
+          · junto: ${nj[i]}</div></div>`).join('')}
+      </div>
+      <p class="hint" style="margin:0 0 10px">Preço nacional ÷ custo posto no Brasil. O preço nacional é o do produto igual
+      mais barato à venda no Brasil; sem o igual, o do mais parecido, marcado como <b>comparação aproximada</b>.
+      "Junto" é a conta embarcando com outros produtos, quando as despesas do embarque se dividem. Os descartados não entram.</p>
+      <div class="chips" id="a-faixas" style="margin:0 0 12px">
+        ${[{ id: '', nome: 'Todos' }].concat(ANALISE.FAIXAS).map(f =>
+          `<span class="chip${aFaixa === f.id ? ' on' : ''}" data-faixa="${f.id}">${esc(f.nome)}</span>`).join('')}
+      </div>
+      <div class="lista">${lista.map(itemVale).join('') || '<div class="empty">Nenhum produto nesta faixa.</div>'}</div>
+      ${fora.length ? `<h3 style="margin:18px 0 9px">Sem como avaliar ainda (${fora.length})</h3>
+        <div class="lista">${fora.map(({ p, a }) => `<div class="it" data-a-abrir="${p.id}">
+          <div class="it-nome">${esc(p.nome)}</div>
+          <div class="it-sub">${esc([p.forn, quemDe(p)].filter(Boolean).join(' · '))}</div>
+          <p class="hint" style="margin:6px 0 0">${esc(a && a.fora ? a.fora
+            : (!a ? 'Este produto ainda não entrou na pesquisa.' : (!(Number(p.preco) > 0) ? 'Falta o preço FOB.' : 'Sem preço de comparação no Brasil.')))}</p>
+        </div>`).join('')}</div>` : ''}`;
+    el.querySelectorAll('[data-faixa]').forEach(c => c.onclick = () => { aFaixa = c.dataset.faixa; renderAnalise(); });
+    el.querySelectorAll('[data-a-abrir]').forEach(c => c.onclick = () => abrirProduto(c.dataset.aAbrir));
+  }
+
+  /* ---- destaques ---- */
+  function renderDestaques(el) {
+    const ok = contasAna().filter(x => x.r);
+    const linha = (x, extra) => `<div class="it" data-a-abrir="${x.p.id}"><div class="it-top"><div class="it-b">
+        <div class="it-nome">${esc(x.p.nome)}</div>
+        <div class="it-sub">${esc([x.p.forn, quemDe(x.p), x.p.nota ? 'nota ' + x.p.nota : ''].filter(Boolean).join(' · '))}</div>
+        ${extra ? `<div class="a-linhas"><p>${extra}</p></div>` : ''}
+      </div><div style="text-align:right"><div class="a-mult">${mult(x.r.multiplo)}</div>${pillFaixa(x.r.faixa)}</div></div></div>`;
+    const blocos = [];
+    const top = ok.filter(x => x.r.faixa.min >= 1.8).sort((a, b) => b.r.multiplo - a.r.multiplo).slice(0, 6);
+    if (top.length) blocos.push(['Melhores oportunidades', 'Os de maior folga entre o custo posto no Brasil e o preço do igual (ou do mais parecido) à venda aqui.',
+      top.map(x => linha(x, `${brl0(x.r.custo)} contra ${brl0(x.r.ref)}${tagAprox(x.a)}${x.a.barreira ? ' · <span class="warn" style="margin:0">' + esc(x.a.barreira) + '</span>' : ''}`))]);
+
+    // o mesmo produto em vários fornecedores: quem sai mais barato posto no Brasil
+    const grupos = {};
+    ok.forEach(x => { const k = x.a.grupo || x.a.tipo || ''; if (k) (grupos[k] = grupos[k] || []).push(x); });
+    const comp = Object.keys(grupos).filter(k => grupos[k].length > 1).map(k => {
+      const g = grupos[k].sort((a, b) => a.r.custo - b.r.custo);
+      return `<div class="card tight a-grupo"><b>${esc(g[0].a.tipo_nome || g[0].p.nome)}</b>
+        <table class="br" style="margin-top:6px">${g.map((x, i) => `<tr data-a-abrir="${x.p.id}">
+          <td>${i === 0 ? '★ ' : ''}${esc(x.p.forn || x.p.nome)}<span class="ref">${esc(textoPedido(x.p, x.a, x.r))} · ${usd(Number(x.p.preco))} FOB</span></td>
+          <td>${brl0(x.r.custo)}<span class="ref">${mult(x.r.multiplo)} · ${esc(x.r.faixa.nome)}</span></td></tr>`).join('')}</table></div>`;
+    });
+    if (comp.length) blocos.push(['Melhor fornecedor de cada produto', 'Quando acharam o mesmo tipo de produto em mais de um estande: o de menor custo posto no Brasil vem primeiro (★). Confira medidas e acabamento: o mesmo tipo pode vir em modelos diferentes.', comp]);
+
+    const negociar = ok.filter(x => x.r.faixa.min < 1.8 && (x.p.fav || (x.p.nota || 0) >= 7))
+      .map(x => ({ x, alvo: ANALISE.fobPara(x.p, x.a, cfg, 1.8) }))
+      .filter(o => o.alvo && o.alvo.fob != null && o.alvo.queda <= 0.5)
+      .sort((a, b) => a.alvo.queda - b.alvo.queda);
+    if (negociar.length) blocos.push(['Para negociar', 'Com nota alta ou estrela, mas a conta ainda não fecha: o FOB que deixaria cada um na faixa Bom.',
+      negociar.map(({ x, alvo }) => linha(x, `FOB até <b>${usd(alvo.fob)}</b> (hoje ${usd(Number(x.p.preco))}, ${Math.round(alvo.queda * 100)}% a menos)`))]);
+
+    const surpresa = ok.filter(x => x.r.faixa.min >= 1.8 && x.p.nota && x.p.nota <= 5);
+    if (surpresa.length) blocos.push(['Nota baixa, conta boa', 'A impressão no estande foi fraca, mas a conta é boa. Vale pedir amostra antes de descartar.', surpresa.map(x => linha(x))]);
+
+    const juntar = ok.filter(x => x.r.faixaJunto.min > x.r.faixa.min);
+    if (juntar.length) blocos.push(['Melhor embarcando junto', 'Pedido pequeno carrega sozinho as despesas do embarque; num embarque com outros produtos, sobe de faixa.',
+      juntar.map(x => linha(x, `Sozinho: ${esc(x.r.faixa.nome)} · junto: <b>${esc(x.r.faixaJunto.nome)}</b> (${mult(x.r.multiploJunto)})`))]);
+
+    const fav = ok.filter(x => x.p.fav).sort((a, b) => b.r.multiplo - a.r.multiplo);
+    if (fav.length) blocos.push(['Favoritos do time', 'Os marcados com estrela, com a conta de cada um.', fav.map(x => linha(x))]);
+
+    el.innerHTML = blocos.map(([t, nota, itens]) => `<h3 style="margin:16px 0 4px">${esc(t)}</h3>
+      <p class="hint" style="margin:0 0 9px">${esc(nota)}</p><div class="lista">${itens.join('')}</div>`).join('')
+      || '<div class="empty">Ainda não há destaques para este filtro.</div>';
+    el.querySelectorAll('[data-a-abrir]').forEach(c => c.onclick = () => abrirProduto(c.dataset.aAbrir));
+  }
+
+  /* ---- comparação com o produto nacional ---- */
+  // a data em que o anúncio foi visto: a do anúncio ou, se não veio, a da pesquisa
+  const vistoEm = (c) => c.visto_em || (cfg.analise && cfg.analise.meta && cfg.analise.meta.visto_em) || '';
+  const compHtml = (c) => `<div class="a-comp">
+      <div class="a-comp-top"><b>${esc(c.produto)}</b>${c.preco_txt || Number(c.preco) > 0
+        ? `<span class="a-preco">${esc(c.preco_txt || brl(Number(c.preco)))}</span>` : ''}</div>
+      <div class="it-sub">${esc([c.marca, c.loja, vistoEm(c) ? 'visto em ' + vistoEm(c).split('-').reverse().slice(0, 2).join('/') : ''].filter(Boolean).join(' · '))}</div>
+      ${c.specs ? `<p class="hint" style="margin:4px 0 0">${esc(c.specs)}</p>` : ''}
+      ${c.diferenca ? `<p class="hint" style="margin:4px 0 0"><b>Diferença:</b> ${esc(c.diferenca)}</p>` : ''}
+      ${urlOk(c.url) ? `<a class="ghost as-btn a-link" href="${esc(urlOk(c.url))}" target="_blank" rel="noopener">Abrir anúncio</a>` : ''}
+    </div>`;
+  function renderNacionais(el) {
+    const grupos = {};
+    contasAna().forEach(x => {
+      if (!x.a || !x.a.tipo || (!x.a.nacionais && !x.a.sem_comparavel)) return;
+      const k = x.a.tipo || x.p.id;
+      (grupos[k] = grupos[k] || { a: x.a, itens: [] }).itens.push(x);
+    });
+    const chaves = Object.keys(grupos).sort((a, b) => {
+      // os que valem mais a pena primeiro
+      const m = (k) => Math.max(...grupos[k].itens.map(x => x.r ? x.r.multiplo : 0));
+      return m(b) - m(a);
+    });
+    el.innerHTML = `<p class="hint" style="margin:0 0 10px">Anúncios do produto igual ou mais parecido à venda no Brasil, com preço e link,
+      vistos na data indicada. Preço muda: abra o anúncio antes de decidir.</p>` + chaves.map(k => {
+      const { a, itens } = grupos[k];
+      const cps = a.nacionais || [];
+      return `<div class="card a-nac${aFoco === k ? ' a-foco' : ''}" id="a-nac-${esc(k)}">
+        <h3 style="margin-bottom:4px">${esc(a.tipo_nome || itens[0].p.nome)}</h3>
+        <p class="hint" style="margin:0 0 8px">${itens.map(x => esc(x.p.forn || x.p.nome) + ' ' + usd(Number(x.p.preco))
+          + (x.r ? ' → custo ' + brl0(x.r.custo) : '')).join(' · ')}</p>
+        ${a.nac_config ? `<p class="hint" style="margin:0 0 8px"><b>Comparado como:</b> ${esc(a.nac_config)}</p>` : ''}
+        ${cps.length ? cps.map(compHtml).join('')
+          : `<div class="alerta warn" style="margin:0 0 8px"><b>Não achamos o produto igual à venda no Brasil</b>${esc(a.nac_nota || '')}</div>`}
+        ${cps.length && a.nac_nota ? `<p class="hint" style="margin:8px 0 0">${esc(a.nac_nota)}</p>` : ''}
+        ${(a.parciais || []).length ? `<h3 style="margin:14px 0 2px">Os mais parecidos (não são iguais)</h3>${a.parciais.map(compHtml).join('')}` : ''}
+        ${a.nac_confirmar ? `<p class="hint" style="margin:8px 0 0"><b>Confirmar com o fornecedor:</b> ${esc(a.nac_confirmar)}</p>` : ''}
+      </div>`;
+    }).join('') || '<div class="empty">Nenhum produto com comparação ainda.</div>';
+    const foco = aFoco && document.getElementById('a-nac-' + aFoco);
+    if (foco) { try { foco.scrollIntoView({ block: 'start' }); } catch (e) { } }
+    aFoco = '';
+  }
+
+  /* ---- regulação: as fontes, sem veredito ---- */
+  function renderRegulacao(el) {
+    const temas = temasAna();
+    const porTema = {};
+    contasAna().forEach(x => {
+      if (!x.a) return;
+      // tema ainda sem fontes no aparelho vai para "Outros produtos"
+      const t = x.a.regulacao && temas[x.a.regulacao] ? x.a.regulacao : '_outros';
+      (porTema[t] = porTema[t] || []).push(x);
+    });
+    const ordem = Object.keys(porTema).sort((a, b) => (a === '_outros') - (b === '_outros'));
+    const tabela = (itens) => {
+      const ncms = Array.from(new Set(itens.map(x => String(x.p.ncm || x.a.ncm || '').replace(/\D/g, '')).filter(n => n.length === 8)));
+      if (!ncms.length) return '';
+      return `<p class="hint" style="margin:0 0 4px">Na tabela do Siscomex que o app carrega (NCM provável):</p>` + ncms.map(n => {
+        const r = BASE.risco(n, { cond: 'novo', texto: '' });
+        return `<div class="a-ncm"><span class="code">${fmtNcm(n)}</span><span class="ref">${esc((r.item && r.item.desc) || '')}</span>
+          <div class="a-ncm-r"><span class="tag ${NIVEL_TAG[r.nivel] || ''}">${esc(r.rotulo)}</span>${esc(r.orgaos.join(' / '))}</div></div>`;
+      }).join('') + '<div style="height:8px"></div>';
+    };
+    el.innerHTML = `<div class="alerta warn" style="margin-bottom:12px"><b>Não é parecer</b>São as fontes que a pesquisa achou,
+      para vocês lerem e confirmarem com o despachante e com o órgão. A NCM também é a provável: confirme antes.</div>` + ordem.map(t => {
+      const itens = porTema[t];
+      const tema = temas[t] || null;
+      const artigos = (tema && tema.artigos) || [];
+      return `<div class="card">
+        <h3 style="margin-bottom:4px">${esc(tema ? tema.titulo : 'Outros produtos')}</h3>
+        <p class="hint" style="margin:0 0 8px">${esc(Array.from(new Set(itens.map(x => x.p.nome))).join(' · '))}</p>
+        ${tabela(itens)}
+        ${artigos.map(ar => `<div class="a-comp">
+            <div class="a-comp-top"><b>${esc(ar.titulo)}</b></div>
+            <div class="it-sub">${esc([ar.fonte, ar.data].filter(Boolean).join(' · '))}</div>
+            <p class="hint" style="margin:4px 0 0">${esc(ar.resumo || '')}</p>
+            ${(ar.atos || []).length ? `<div class="it-foot" style="margin-top:6px">${ar.atos.map(x => `<span class="tag">${esc(x)}</span>`).join('')}</div>` : ''}
+            ${urlOk(ar.url) ? `<a class="ghost as-btn a-link" href="${esc(urlOk(ar.url))}" target="_blank" rel="noopener">Abrir fonte</a>` : ''}
+          </div>`).join('') || (tema ? '<p class="hint">A pesquisa não achou artigo sobre este tema.</p>' : '')}
+        ${tema && tema.divergencias ? `<p class="hint" style="margin:8px 0 0"><b>Onde as fontes divergem:</b> ${esc(tema.divergencias)}</p>` : ''}
+        ${tema && (tema.perguntas || []).length ? `<p class="hint" style="margin:8px 0 4px"><b>Para perguntar ao despachante ou ao órgão:</b></p>
+          <ul class="a-perguntas">${tema.perguntas.map(q => `<li>${esc(q)}</li>`).join('')}</ul>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  /* o bloco do detalhe do produto */
+  function blocoAnalise(p) {
+    const a = linhaAna(p);
+    if (!a) return '';
+    const r = ANALISE.calcular(p, a, cfg);
+    // o anúncio que deu o preço de comparação
+    const cp = a.ref && (a.nacionais || []).concat(a.parciais || []).find(c => Math.abs(Number(c.preco) - Number(a.ref.valor)) < 0.01);
+    return `<div class="card" style="margin:12px 0 0">
+      <h3 style="margin-bottom:8px">Análise pós-feira</h3>
+      ${r ? `<p style="margin:0 0 6px">${pillFaixa(r.faixa)} <b>${mult(r.multiplo)}</b> · custo posto no Brasil ${brl0(r.custo)},
+          ${refRotulo(a)} ${brl0(r.ref)}${tagAprox(a)}</p>
+          <p class="hint" style="margin:0">${esc(textoPedido(p, a, r))} · frete ${usd(r.freteUsd)} (${esc(r.freteModo)})</p>`
+        : `<p class="hint" style="margin:0">${esc(a.fora || 'Sem preço de comparação no Brasil.')}</p>`}
+      ${cp ? `<p class="hint" style="margin:6px 0 0">Comparado com: ${esc(cp.produto)} — ${esc(cp.loja || '')} ${esc(cp.preco_txt || '')}</p>`
+        : (r && a.ref.loja ? `<p class="hint" style="margin:6px 0 0">Comparado com: ${esc(a.ref.loja)}, ${brl(Number(a.ref.valor))}</p>` : '')}
+      ${r && a.ref.nota ? `<p class="hint" style="margin:6px 0 0">${esc(a.ref.nota)}</p>` : ''}
+      ${a.barreira ? `<p class="warn">${esc(a.barreira)}</p>` : ''}
+      <button class="ghost" id="m-analise" style="margin-top:10px">Ver comparação e regulação na Análise</button>
+    </div>`;
+  }
+
   /* ---------------- config ---------------- */
   const MAP_CFG = {
     'k-usd': 'usdBrl', 'k-cny': 'cnyBrl', 'k-icms': 'icmsPct', 'k-regime': 'regime',
@@ -2880,7 +3238,8 @@
         cartao: !!m.cartao, audio: !!m.audio, placa: !!m.placa
       }))));
     }).then(midias => {
-      const pacote = { app: 'canton-scout', versao: 1, exportado: new Date().toISOString(), cfg, produtos, midias };
+      const pacote = { app: 'canton-scout', versao: 1, exportado: new Date().toISOString(),
+        cfg: Object.assign({}, cfg, { analise: undefined }), produtos, midias };
       baixar(`canton-scout-${hoje()}.json`, new Blob([JSON.stringify(pacote)], { type: 'application/json' }));
       toast('Backup gerado — guarde no notebook');
     });
@@ -3043,6 +3402,16 @@
     $('#q').oninput = buscarNcmDebounce;
     // custos
     $('#c-produto').onchange = renderCustos;
+    // análise pós-feira
+    $$('#a-aba button').forEach(b => b.onclick = () => { aAba = b.dataset.v; renderAnalise(); window.scrollTo(0, 0); });
+    ['anaLcl', 'ana20', 'ana40'].forEach(k => {
+      const e = $('#k-' + k);
+      e.oninput = e.onchange = () => {
+        const v = parseFloat(e.value);
+        if (!(v > 0)) return;
+        cfg[k] = v; DB.setCfg(k, v); renderAnalise();
+      };
+    });
     // modal
     $('#modal-x').onclick = pedirFechar;
     $('#modal').onclick = (e) => { if (e.target.id === 'modal') pedirFechar(); };

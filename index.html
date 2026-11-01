@@ -206,6 +206,38 @@
     <div id="c-saida"></div>
   </section>
 
+  <!-- ======================= ANÁLISE ======================= -->
+  <section id="v-analise" class="view">
+    <div class="seg a-abas" id="a-aba">
+      <button type="button" class="on" data-v="vale">Vale a pena</button>
+      <button type="button" data-v="destaques">Destaques</button>
+      <button type="button" data-v="nacionais">Nacionais</button>
+      <button type="button" data-v="regulacao">Regulação</button>
+    </div>
+    <div id="a-quem" class="chips" style="margin:0 0 4px"></div>
+    <p id="a-estado" class="hint" style="margin:6px 0 12px"></p>
+    <div id="a-vale"></div>
+    <div id="a-destaques" hidden></div>
+    <div id="a-nacionais" hidden></div>
+    <div id="a-regulacao" hidden></div>
+
+    <details class="card a-premissas">
+      <summary><h3>Como a conta é feita</h3></summary>
+      <p class="hint">O pedido é o MOQ que vocês cadastraram — ou o "Vou pedir", quando é maior. Sem MOQ, vale o que o
+      fornecedor falou na observação ou, sem nada, a menor carga que vale embarcar (1 m³).
+      O frete sai do volume desse pedido: até 15 m³ em carga fracionada; acima, o contêiner (ou a combinação) mais barato.
+      O volume é o anotado no produto; sem ele, o da caixa estimado na pesquisa.</p>
+      <p class="hint">Câmbio, ICMS, regime, seguro e despesas do embarque são os da <b>Config</b> deste celular.
+      O preço de comparação é o do produto igual mais barato à venda no Brasil, pesquisado na data que aparece em cada anúncio.</p>
+      <div class="row row3" style="margin-top:12px">
+        <div class="f"><label for="k-anaLcl">Fracionado US$/m³</label><input id="k-anaLcl" type="number" step="1" inputmode="decimal"></div>
+        <div class="f"><label for="k-ana20">Contêiner 20' US$</label><input id="k-ana20" type="number" step="50" inputmode="decimal"></div>
+        <div class="f"><label for="k-ana40">Contêiner 40' US$</label><input id="k-ana40" type="number" step="50" inputmode="decimal"></div>
+      </div>
+      <p class="hint">Tarifas de referência de Xangai/Shenzhen a Itajaí. Troque pela cotação do agente de cargas e a conta refaz sozinha.</p>
+    </details>
+  </section>
+
   <!-- ======================= CONFIG ======================= -->
   <section id="v-config" class="view">
     <div class="card">
@@ -323,6 +355,7 @@
   <button data-v="produtos"><span>&#128230;</span>Produtos</button>
   <button data-v="ncm"><span>&#128269;</span>NCM</button>
   <button data-v="custos"><span>&#128181;</span>Custos</button>
+  <button data-v="analise"><span>&#128202;</span>Análise</button>
   <button data-v="config"><span>&#9881;</span>Config</button>
 </nav>
 
@@ -332,6 +365,7 @@
 <script src="js/db.js"></script>
 <script src="js/dados.js"></script>
 <script src="js/custos.js"></script>
+<script src="js/analise.js"></script>
 <script src="js/visao.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/ia.js"></script>
