@@ -63,7 +63,7 @@ main{padding:16px}
 @keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ---------- abas ---------- */
-#tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(5,1fr);
+#tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(6,1fr);
   background:rgba(14,22,38,.97);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-top:1px solid var(--line);padding-bottom:var(--safe-b)}
 #tabs button{position:relative;background:none;border:0;color:var(--dim2);font:inherit;font-size:10px;
@@ -303,3 +303,30 @@ details summary::-webkit-details-marker{display:none}
   .card.hero{grid-template-columns:1fr 1fr}
   .grade{grid-template-columns:repeat(3,1fr)}
 }
+
+/* ---------- análise pós-feira ---------- */
+.seg.a-abas{grid-template-columns:repeat(4,1fr);margin-bottom:10px}
+.seg.a-abas button{font-size:12px;padding-left:2px;padding-right:2px}
+.a-mult{font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin-bottom:5px;font-variant-numeric:tabular-nums}
+.a-linhas{margin-top:8px}
+.a-linhas p{margin:0 0 4px;font-size:12px;color:var(--dim);line-height:1.5;overflow-wrap:anywhere}
+.a-linhas p:last-child{margin-bottom:0}
+.a-linhas b{color:var(--txt)}
+.kpi.a-kpi .k-v{font-size:24px}
+.a-comp{border-top:1px solid var(--line);padding:10px 0}
+.a-comp:last-of-type{padding-bottom:4px}
+.a-comp-top{font-size:13.5px;overflow-wrap:anywhere;line-height:1.45}
+.a-preco{display:block;margin-top:3px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--txt)}
+.a-ncm{border-top:1px solid var(--line);padding:8px 0;font-size:12.5px;line-height:1.5}
+.a-ncm .ref{color:var(--dim2);margin-left:6px}
+.a-ncm-r{margin-top:4px;color:var(--dim);font-size:12px}
+.a-ncm-r .tag{margin-right:6px}
+.ghost.as-btn.a-link{display:inline-block;width:auto;margin-top:8px;padding:8px 12px;font-size:12.5px;text-decoration:none}
+.a-nac.a-foco{border-color:var(--ac)}
+.a-grupo table.br td{font-size:12.5px}
+.a-grupo tr{cursor:pointer}
+.a-perguntas{margin:0;padding-left:18px;font-size:12px;color:var(--dim);line-height:1.55}
+.a-perguntas li{margin-bottom:4px}
+.a-premissas summary h3{margin:0}
+.a-premissas summary::after{content:'▾';float:right;color:var(--dim2);margin-top:-15px}
+.a-premissas[open] summary::after{content:'▴'}

@@ -44,7 +44,7 @@ o app não chuta.
 **Quem sabe comex (modo Buscar por texto)** — busca livre em português ou
 inglês sobre os 10.516 códigos, com os candidatos ranqueados.
 
-## As cinco telas
+## As seis telas
 
 - **Capturar** — foto pela câmera nativa, preço FOB, MOQ, peso, CBM, estande,
   WeChat do fornecedor. Salva na hora, sem rede. As fotos são reduzidas para
@@ -79,6 +79,20 @@ inglês sobre os 10.516 códigos, com os candidatos ranqueados.
 - **NCM** — busca por descrição em **português ou inglês** (os estandes
   atendem em inglês). Mostra II, IPI e o risco de cada candidato.
 - **Custos** — extrato linha a linha, com a base de cálculo de cada tributo.
+- **Análise** — a análise pós-feira, em quatro partes:
+  **Vale a pena** (o veredito de cada produto: preço do igual mais barato à venda
+  no Brasil ÷ custo posto no Brasil; Ótimo a partir de 2,5×, Bom de 1,8×,
+  Apertado de 1,3×), **Destaques** (melhores oportunidades, o fornecedor mais
+  barato de cada produto, o FOB que faria a conta fechar, os que melhoram
+  embarcando junto), **Nacionais** (os anúncios brasileiros comparados, com
+  preço, link e o que confirmar com o fornecedor) e **Regulação** (artigos e
+  normas sobre importar cada tipo de produto — fontes para ler, não parecer).
+  O pedido é o MOQ cadastrado (ou o "Vou pedir", quando maior) e o frete sai do
+  volume dele: até 15 m³ fracionado, acima disso o contêiner mais barato. As
+  tarifas de frete se trocam na própria aba; câmbio e impostos são os da Config.
+  A pesquisa fica no servidor da viagem (tabela `canton_analise`, só leitura
+  para o app) e é baixada com internet; depois abre offline. O detalhe de cada
+  produto também mostra a conta dele.
 - **Config** — câmbio, UF/ICMS, regime tributário, modal, frete, despesas.
   E o **teste de modo offline**.
 
@@ -202,11 +216,12 @@ recarregamento no celular** (o service worker guarda a versão antiga).
 ## Estrutura
 
 ```
-index.html              tela única, cinco abas
+index.html              tela única, seis abas
 app.css
 js/db.js                IndexedDB: produtos, fotos, config
 js/dados.js             base fiscal, busca NCM, motor de risco
 js/custos.js            cálculo de custo landed
+js/analise.js           conta da análise pós-feira (pedido, frete, veredito)
 js/ui.js                telas e amarração
 sw.js                   service worker — é o que faz abrir offline
 data/fiscal.json        NCM + II + IPI          (3,0 MB)

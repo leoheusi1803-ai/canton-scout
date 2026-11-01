@@ -24,6 +24,8 @@
    ============================================================ */
 const SYNC = (() => {
   const URL_BASE = 'https://biqdkweqikorbvemfxrp.supabase.co/rest/v1/canton_produtos';
+  // a análise pós-feira da viagem: o app só lê
+  const URL_ANALISE = 'https://biqdkweqikorbvemfxrp.supabase.co/rest/v1/canton_analise';
   const CHAVE = 'sb_publishable_nxQ14IRFnT0Fem9cGNCkiw_73H-J15d';
   const LOTE_ENVIO = 20;     // com miniatura, ~25 KB por produto
   const LOTE_BUSCA = 40;     // ids por consulta, cabe folgado na URL
@@ -188,5 +190,12 @@ const SYNC = (() => {
       .then(r => { rodando = false; return r; });
   }
 
-  return { configurar, ativo, estado, codigo, normalizar, sincronizar };
+  /* comparáveis nacionais, volume da caixa e artigos de regulação de cada
+     produto da viagem; o mesmo código protege, e nada aqui é enviado */
+  function lerAnalise() {
+    if (!viagem) return Promise.reject(new Error('preencha o código da viagem em Config'));
+    return pedir(URL_ANALISE + '?select=id,dados,atualizado&order=id.asc&limit=2000').then(r => r.json());
+  }
+
+  return { configurar, ativo, estado, codigo, normalizar, sincronizar, lerAnalise };
 })();

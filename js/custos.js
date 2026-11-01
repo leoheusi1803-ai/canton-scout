@@ -252,7 +252,9 @@ const CUSTOS = (() => {
     capatazia: false, capataziaBrl: 0,
     modal: 'lcl', freteModo: 'tarifa', tarifaFrete: 95, freteUsd: 0,
     seguroPct: 0.35, despesasBrl: 3500, siscomexBrl: 154.23,
-    margemAlvo: 45
+    margemAlvo: 45,
+    // análise pós-feira: tarifas de frete por embarque (US$)
+    anaLcl: 95, ana20: 4000, ana40: 6000
   };
 
   return { calcular, precoVenda, pisCofinsDe, CFG_PADRAO, PIS_IMP, COFINS_IMP, AFRMM,
