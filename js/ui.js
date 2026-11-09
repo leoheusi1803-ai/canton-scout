@@ -2,7 +2,7 @@
    ui.js — telas e amarração. Nada aqui depende de rede.
    ============================================================ */
 (() => {
-  const VERSAO = 'v27 · 01/11/2026 · análise pós-feira';
+  const VERSAO = 'v28 · 09/11/2026 · baixar a foto';
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s)
@@ -163,6 +163,31 @@
     if (!urlCache.has(id)) urlCache.set(id, URL.createObjectURL(blob));
     return urlCache.get(id);
   }
+
+  /* ---------------- baixar a foto ----------------
+     No produto, um toque na foto (ou na placa, ou no cartão) baixa o arquivo.
+     No computador ele vai para Downloads; no celular abre o compartilhar,
+     que tem "Salvar imagem" — é o jeito de pôr no Fotos do iPhone.     */
+  const slug = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+  function extDe(blob, nome) {
+    const t = (blob && blob.type) || '';
+    const e = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif',
+      'image/gif': 'gif', 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm' }[t];
+    if (e) return e;
+    const x = /\.([a-z0-9]{2,4})$/i.exec(nome || '');
+    return x ? x[1].toLowerCase() : (t.startsWith('video') ? 'mp4' : 'jpg');
+  }
+  // "panela-de-ferro_kingway_foto2.jpg"
+  const nomeFoto = (p, oque, blob, m) => [slug(p.nome) || 'produto', slug(p.forn), oque].filter(Boolean).join('_') + '.' + extDe(blob, m && m.nome);
+  const ehCelular = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent));      // iPad se diz Mac
+  function baixarFoto(nome, blob) {
+    if (ehCelular()) { baixar(nome, blob); return; }
+    baixarDireto(nome, blob);
+    toast('Foto baixada: ' + nome);
+  }
+  const botaoBaixar = (id) => `<span class="baixa" data-baixar="${esc(id)}" title="Baixar" aria-label="Baixar">⬇</span>`;
 
   /* ---------------- unidade de venda ----------------
      Pedra e painel se vendem por m², louça por peça ou conjunto, e o
@@ -1074,18 +1099,20 @@
       const audios = ms.filter(m => m.audio);
       const cartoes = ms.filter(m => m.cartao);
       const placas = ms.filter(m => m.placa);
-      let fotos = ms.filter(m => !m.audio && !m.cartao && !m.placa).map(m => {
+      const doProduto = ms.filter(m => !m.audio && !m.cartao && !m.placa);
+      let fotos = doProduto.map(m => {
         const u = blobUrl(m.id, m.blob);
         return (m.tipo || '').startsWith('video')
-          ? `<div class="thumb"><video src="${u}" controls playsinline></video></div>`
-          : `<div class="thumb"><img src="${u}" alt=""></div>`;
+          ? `<div class="thumb"><video src="${u}" controls playsinline></video>${botaoBaixar(m.id)}</div>`
+          : `<div class="thumb"><img src="${u}" alt="" data-baixar="${esc(m.id)}">${botaoBaixar(m.id)}</div>`;
       }).join('');
-      if (!fotos && p.miniatura) fotos = `<div class="thumb"><img src="${esc(p.miniatura)}" alt=""></div>`;
+      // do outro celular vem só a miniatura: é ela que se baixa
+      if (!fotos && p.miniatura) fotos = `<div class="thumb"><img src="${esc(p.miniatura)}" alt="" data-baixar="mini">${botaoBaixar('mini')}</div>`;
       // a placa vai junto das fotos, pequena: dela só se precisa do número
-      fotos += placas.map(m => `<div class="thumb"><img src="${blobUrl(m.id, m.blob)}" alt="placa" data-placa="1">
-        <span class="vid">📍 placa</span></div>`).join('');
+      fotos += placas.map(m => `<div class="thumb"><img src="${blobUrl(m.id, m.blob)}" alt="placa" data-placa="1" data-baixar="${esc(m.id)}">
+        <span class="vid">📍 placa</span>${botaoBaixar(m.id)}</div>`).join('');
       // o cartão em tamanho de leitura: é dele que sai o WeChat
-      const cartaoHtml = cartoes.map(m => `<img class="cartao-img" src="${blobUrl(m.id, m.blob)}" alt="cartão">`).join('');
+      const cartaoHtml = cartoes.map(m => `<img class="cartao-img" src="${blobUrl(m.id, m.blob)}" alt="cartão" data-baixar="${esc(m.id)}" title="Toque para baixar">`).join('');
       const sons = audios.map(m => `<audio controls preload="none" src="${blobUrl(m.id, m.blob)}"></audio>`).join('');
       const r = p.ncm ? BASE.risco(p.ncm, { cond: p.cond, texto: p.nome + ' ' + p.desc }) : null;
       modal(`
@@ -1095,6 +1122,7 @@
         <button class="ghost" id="m-editar">✏️ Editar · pôr foto da placa, cartão ou áudio</button>
         ${fotos ? `<div class="thumbs">${fotos}</div>` : ''}
         ${cartaoHtml}
+        ${fotos || cartaoHtml ? '<p class="hint" style="margin:-4px 0 10px">Toque na foto para baixar.</p>' : ''}
         ${sons ? `<div class="sons">${sons}</div>` : ''}
         ${cartoes.length || placas.length || audios.length ? `<div style="margin:0 0 10px">
           ${cartoes.length ? '<button class="ghost" id="m-ler-cartao">📇 Ler cartão com a IA</button>' : ''}
@@ -1152,6 +1180,21 @@
       /* ---- situação, categoria e notas ---- */
       // placa que não abre não vira a miniatura do produto
       $('#modal-body').querySelectorAll('.thumbs img').forEach(i => semFoto(i, i.dataset.placa ? null : p));
+      /* ---- baixar a foto: a do aparelho, ou a miniatura quando a foto não está aqui ---- */
+      const porId = new Map(ms.map(m => [m.id, m]));
+      $('#modal-body').querySelectorAll('[data-baixar]').forEach(el => el.onclick = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const id = el.dataset.baixar, m = porId.get(id);
+        const img = el.tagName === 'IMG' ? el : (el.parentNode && el.parentNode.querySelector('img'));
+        // a foto que o aparelho perdeu já aparece como miniatura: baixa-se o que se vê
+        const daMini = id === 'mini' || !m || m.perdida || !!(img && p.miniatura && img.getAttribute('src') === p.miniatura);
+        const video = !!(m && (m.tipo || '').startsWith('video'));
+        const n = doProduto.length > 1 ? String(doProduto.indexOf(m) + 1) : '';
+        const oque = m && m.cartao ? 'cartao' : m && m.placa ? 'placa' : daMini ? 'miniatura' : (video ? 'video' : 'foto') + n;
+        (daMini ? (p.miniatura ? fetch(p.miniatura).then(r => r.blob()) : Promise.reject(new Error('sem miniatura'))) : Promise.resolve(m.blob))
+          .then(blob => baixarFoto(nomeFoto(p, oque, blob, daMini ? null : m), blob))
+          .catch(() => toast('Não consegui baixar esta foto'));
+      });
       const salvar = () => { p.atualizado = Date.now(); agendarSync(); return DB.salvarProduto(p); };
       $('#m-editar').onclick = () => editarProduto(p);
       if ($('#m-analise')) $('#m-analise').onclick = () => {

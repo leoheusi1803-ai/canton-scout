@@ -73,7 +73,9 @@ inglês sobre os 10.516 códigos, com os candidatos ranqueados.
   **✏️ Editar**, no produto salvo: corrige qualquer campo e acrescenta o que
   faltou no estande — foto da placa, do cartão, do produto ou um áudio — com a
   IA lendo como na captura (o que ela muda nos campos volta com "↩ desfazer").
-  Também tira foto ou áudio errado (×). Nada muda até "Salvar alterações";
+  Também tira foto ou áudio errado (×). **Toque numa foto** (ou na placa, ou no
+  cartão) para baixar: no computador vai para Downloads; no celular abre o
+  compartilhar, com "Salvar imagem". Do produto de outro celular, baixa a miniatura. Nada muda até "Salvar alterações";
   sair sem salvar pergunta antes de descartar. Vale para o produto dos outros
   celulares: os campos sincronizam, as fotos ficam em quem pôs.
 - **NCM** — busca por descrição em **português ou inglês** (os estandes

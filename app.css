@@ -145,6 +145,10 @@ button.ghost:active,.ghost.as-btn:active{background:var(--card2);border-color:va
 .thumb .vid{position:absolute;bottom:3px;left:5px;font-size:9.5px;font-weight:600;color:#fff;
   text-shadow:0 1px 4px #000}
 .thumb .aud{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px}
+/* no detalhe do produto: um toque baixa a foto */
+.thumb .baixa{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;
+  background:rgba(0,0,0,.66);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.cartao-img{cursor:pointer}
 .shoot-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .e-add{display:grid;gap:10px;margin:0 0 12px}   /* botões de acrescentar, na edição do produto */
 .shoot-mini{padding:13px 12px;gap:10px;font:inherit;color:var(--txt);text-align:left;width:100%}
